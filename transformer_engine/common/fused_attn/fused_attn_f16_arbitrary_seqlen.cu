@@ -49,6 +49,40 @@
 
 namespace transformer_engine {
 namespace fused_attn {
+
+// Wraps a Python callable (PyObject*) as a cuDNN frontend score modifier trampoline.
+// The callable is invoked during graph construction with PyCapsule-wrapped pointers
+// to the cuDNN frontend Graph and Tensor_attributes objects (non-owning; shared_ptrs
+// manage lifetime). Returns the modified score tensor, or the input score unchanged
+// if the callable returns None or an invalid capsule.
+static auto make_attention_score_modifier(void *callable) {
+  using Tensor_t = std::shared_ptr<cudnn_frontend::graph::Tensor_attributes>;
+  using Graph_t = std::shared_ptr<cudnn_frontend::graph::Graph>;
+  PyObject *py_callable = static_cast<PyObject *>(callable);
+  return [py_callable](Graph_t graph, Tensor_t score) -> Tensor_t {
+    PyGILState_STATE gstate = PyGILState_Ensure();
+    PyObject *py_graph = PyCapsule_New(graph.get(), "fe::graph::Graph", nullptr);
+    PyObject *py_score = PyCapsule_New(score.get(), "fe::graph::Tensor_attributes", nullptr);
+    PyObject *result = PyObject_CallFunctionObjArgs(py_callable, py_graph, py_score, nullptr);
+    Py_DECREF(py_graph);
+    Py_DECREF(py_score);
+    Tensor_t result_tensor = score;  // default: return input score unchanged
+    if (result != nullptr) {
+      void *ptr = PyCapsule_IsValid(result, "fe::graph::Tensor_attributes")
+                      ? PyCapsule_GetPointer(result, "fe::graph::Tensor_attributes")
+                      : nullptr;
+      if (ptr != nullptr) {
+        // Wrap the raw pointer as a non-owning shared_ptr (aliasing constructor)
+        result_tensor =
+            Tensor_t(score, static_cast<cudnn_frontend::graph::Tensor_attributes *>(ptr));
+      }
+      Py_DECREF(result);
+    }
+    PyGILState_Release(gstate);
+    return result_tensor;
+  };
+}
+
 void fused_attn_arbitrary_seqlen_fwd_impl(
     int64_t b, int64_t h, int64_t hg, int64_t s_q, int64_t s_kv, int64_t d_qk, int64_t d_v,
     int64_t max_b, int64_t max_t_q, int64_t max_t_kv, int64_t num_pages_k, int64_t num_pages_v,
@@ -339,36 +373,8 @@ void fused_attn_arbitrary_seqlen_fwd_impl(
       }
 
       // score_mod: Python callable (PyObject*) for custom attention score modification.
-      // The callable is invoked during graph construction with PyCapsule-wrapped pointers
-      // to the cuDNN frontend Graph and Tensor_attributes objects.
       if (score_mod != nullptr) {
-        using Tensor_t = std::shared_ptr<fe::graph::Tensor_attributes>;
-        using Graph_t = std::shared_ptr<fe::graph::Graph>;
-        PyObject *py_score_mod = static_cast<PyObject *>(score_mod);
-        auto trampoline = [py_score_mod](Graph_t graph,
-                                         Tensor_t score) -> Tensor_t {
-          PyGILState_STATE gstate = PyGILState_Ensure();
-          // Wrap raw pointers as PyCapsules (non-owning; shared_ptrs manage lifetime)
-          PyObject *py_graph = PyCapsule_New(graph.get(), "fe::graph::Graph", nullptr);
-          PyObject *py_score = PyCapsule_New(score.get(), "fe::graph::Tensor_attributes", nullptr);
-          PyObject *result = PyObject_CallFunctionObjArgs(py_score_mod, py_graph, py_score, nullptr);
-          Py_DECREF(py_graph);
-          Py_DECREF(py_score);
-          Tensor_t result_tensor = score;  // default: return input score unchanged
-          if (result != nullptr) {
-            void *ptr = PyCapsule_IsValid(result, "fe::graph::Tensor_attributes")
-                            ? PyCapsule_GetPointer(result, "fe::graph::Tensor_attributes")
-                            : nullptr;
-            if (ptr != nullptr) {
-              // Wrap the raw pointer as a non-owning shared_ptr (aliasing constructor)
-              result_tensor = Tensor_t(score, static_cast<fe::graph::Tensor_attributes *>(ptr));
-            }
-            Py_DECREF(result);
-          }
-          PyGILState_Release(gstate);
-          return result_tensor;
-        };
-        sdpa_options.set_score_mod(trampoline);
+        sdpa_options.set_score_mod(make_attention_score_modifier(score_mod));
       }
 
       std::shared_ptr<fe::graph::Tensor_attributes> Max, Sum_Exp;
@@ -921,59 +927,11 @@ void fused_attn_arbitrary_seqlen_bwd_impl(
 
       // score_mod: Python callable (PyObject*) for custom attention score modification in forward.
       // score_mod_bprop: Python callable for the backward of the score modification.
-      // Callables receive PyCapsule-wrapped pointers to cuDNN frontend Graph and Tensor_attributes.
       if (score_mod != nullptr) {
-        using Tensor_t = std::shared_ptr<fe::graph::Tensor_attributes>;
-        using Graph_t = std::shared_ptr<fe::graph::Graph>;
-        PyObject *py_score_mod = static_cast<PyObject *>(score_mod);
-        auto trampoline = [py_score_mod](Graph_t graph, Tensor_t score) -> Tensor_t {
-          PyGILState_STATE gstate = PyGILState_Ensure();
-          PyObject *py_graph = PyCapsule_New(graph.get(), "fe::graph::Graph", nullptr);
-          PyObject *py_score = PyCapsule_New(score.get(), "fe::graph::Tensor_attributes", nullptr);
-          PyObject *result = PyObject_CallFunctionObjArgs(py_score_mod, py_graph, py_score, nullptr);
-          Py_DECREF(py_graph);
-          Py_DECREF(py_score);
-          Tensor_t result_tensor = score;
-          if (result != nullptr) {
-            void *ptr = PyCapsule_IsValid(result, "fe::graph::Tensor_attributes")
-                            ? PyCapsule_GetPointer(result, "fe::graph::Tensor_attributes")
-                            : nullptr;
-            if (ptr != nullptr) {
-              result_tensor = Tensor_t(score, static_cast<fe::graph::Tensor_attributes *>(ptr));
-            }
-            Py_DECREF(result);
-          }
-          PyGILState_Release(gstate);
-          return result_tensor;
-        };
-        sdpa_backward_options.set_score_mod(trampoline);
+        sdpa_backward_options.set_score_mod(make_attention_score_modifier(score_mod));
       }
       if (score_mod_bprop != nullptr) {
-        using Tensor_t = std::shared_ptr<fe::graph::Tensor_attributes>;
-        using Graph_t = std::shared_ptr<fe::graph::Graph>;
-        PyObject *py_score_mod_bprop = static_cast<PyObject *>(score_mod_bprop);
-        auto trampoline_bprop = [py_score_mod_bprop](Graph_t graph, Tensor_t score) -> Tensor_t {
-          PyGILState_STATE gstate = PyGILState_Ensure();
-          PyObject *py_graph = PyCapsule_New(graph.get(), "fe::graph::Graph", nullptr);
-          PyObject *py_score = PyCapsule_New(score.get(), "fe::graph::Tensor_attributes", nullptr);
-          PyObject *result =
-              PyObject_CallFunctionObjArgs(py_score_mod_bprop, py_graph, py_score, nullptr);
-          Py_DECREF(py_graph);
-          Py_DECREF(py_score);
-          Tensor_t result_tensor = score;
-          if (result != nullptr) {
-            void *ptr = PyCapsule_IsValid(result, "fe::graph::Tensor_attributes")
-                            ? PyCapsule_GetPointer(result, "fe::graph::Tensor_attributes")
-                            : nullptr;
-            if (ptr != nullptr) {
-              result_tensor = Tensor_t(score, static_cast<fe::graph::Tensor_attributes *>(ptr));
-            }
-            Py_DECREF(result);
-          }
-          PyGILState_Release(gstate);
-          return result_tensor;
-        };
-        sdpa_backward_options.set_score_mod_bprop(trampoline_bprop);
+        sdpa_backward_options.set_score_mod_bprop(make_attention_score_modifier(score_mod_bprop));
       }
 
       auto [dQ, dK, dV] = mha_graph->sdpa_backward(q, k, v, o, dO, stats, sdpa_backward_options);
