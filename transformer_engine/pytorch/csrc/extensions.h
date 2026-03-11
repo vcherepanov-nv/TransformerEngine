@@ -94,7 +94,8 @@ std::vector<py::object> fused_attn_fwd(
     const std::optional<at::Tensor> page_table_k, const std::optional<at::Tensor> page_table_v,
     py::handle s_quantizer, py::handle o_quantizer, const std::optional<at::Tensor> Bias,
     const std::optional<at::Tensor> SoftmaxOffset, const std::optional<at::Generator> rng_gen,
-    size_t rng_elts_per_thread, bool return_max_logit, bool cuda_graph);
+    size_t rng_elts_per_thread, bool return_max_logit, bool cuda_graph,
+    py::object score_mod = py::none());
 
 std::vector<py::object> fused_attn_bwd(
     size_t max_seqlen_q, size_t max_seqlen_kv, float attn_scale, float p_dropout, bool set_zero,
@@ -106,7 +107,8 @@ std::vector<py::object> fused_attn_bwd(
     const std::vector<at::Tensor> Aux_CTX_Tensors,
     const std::optional<at::Tensor> cu_seqlens_q_padded,
     const std::optional<at::Tensor> cu_seqlens_kv_padded, py::handle s_quantizer,
-    py::handle dp_quantizer, py::handle dqkv_quantizer, bool cuda_graph);
+    py::handle dp_quantizer, py::handle dqkv_quantizer, bool cuda_graph,
+    py::object score_mod = py::none(), py::object score_mod_bprop = py::none());
 
 at::Tensor fa_prepare_fwd(at::Tensor qkvi);
 at::Tensor fa_prepare_bwd(at::Tensor q, at::Tensor k, at::Tensor v);

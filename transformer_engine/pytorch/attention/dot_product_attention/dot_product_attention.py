@@ -828,6 +828,8 @@ class DotProductAttention(TransformerEngineBaseModule):
         pad_between_seqs: Optional[bool] = None,
         fp8_output: Optional[bool] = False,
         num_splits: Optional[int] = 1,
+        score_mod=None,
+        score_mod_bprop=None,
     ) -> torch.Tensor:
         r"""
         Dot Product Attention Layer.
@@ -1521,6 +1523,8 @@ class DotProductAttention(TransformerEngineBaseModule):
                         inference_params=inference_params,
                         softmax_offset=softmax_offset,
                         fp8_output=fp8_output,
+                        score_mod=score_mod,
+                        score_mod_bprop=score_mod_bprop,
                     )
                 return self.fused_attention(
                     query_layer,
@@ -1552,6 +1556,8 @@ class DotProductAttention(TransformerEngineBaseModule):
                     inference_params=inference_params,
                     softmax_offset=softmax_offset,
                     fp8_output=fp8_output,
+                    score_mod=score_mod,
+                    score_mod_bprop=score_mod_bprop,
                 )
 
             if use_unfused_attention:

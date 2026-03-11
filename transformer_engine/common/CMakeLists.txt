@@ -264,6 +264,7 @@ target_include_directories(transformer_engine PRIVATE
 target_include_directories(transformer_engine SYSTEM PRIVATE
                            ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}/cccl)
 target_include_directories(transformer_engine PRIVATE "${CUDNN_FRONTEND_INCLUDE_DIR}")
+target_include_directories(transformer_engine PRIVATE ${Python_INCLUDE_DIRS})
 target_include_directories(transformer_engine PRIVATE
                           ${CUTLASS_INCLUDE_DIR}
                           ${CUTLASS_TOOLS_INCLUDE_DIR})

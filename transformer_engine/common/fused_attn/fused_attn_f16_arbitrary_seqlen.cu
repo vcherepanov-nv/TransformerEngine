@@ -4,6 +4,7 @@
  * See LICENSE for license information.
  ************************************************************************/
 
+#include <Python.h>
 #include <cuda_bf16.h>
 #include <cuda_fp16.h>
 #include <cudnn_frontend.h>
@@ -56,8 +57,8 @@ void fused_attn_arbitrary_seqlen_fwd_impl(
     bool is_training, bool return_max_logit, float scaling_factor, float dropout_probability,
     NVTE_QKV_Layout layout, NVTE_Bias_Type bias_type, NVTE_Mask_Type mask_type,
     NVTE_Softmax_Type softmax_type, int64_t window_size_left, int64_t window_size_right,
-    bool bottom_right_diagonal, void *devPtrQ, void *devPtrK, void *devPtrV, void *devPtrBias,
-    void *devPtrSoftmaxOffset, void *devPtrS1, void *devPtrS2, void *devPtrO,
+    bool bottom_right_diagonal, void *score_mod, void *devPtrQ, void *devPtrK, void *devPtrV,
+    void *devPtrBias, void *devPtrSoftmaxOffset, void *devPtrS1, void *devPtrS2, void *devPtrO,
     void *devPtrDropoutSeed, void *devPtrDropoutOffset, void *devPtrCuSeqlensQ,
     void *devPtrCuSeqlensKV, void *devPtrPageTableK, void *devPtrPageTableV,
     void *devPtrSeqOffsetsQ, void *devPtrSeqOffsetsKV, cudnn_frontend::DataType_t tensorType,
@@ -140,6 +141,8 @@ void fused_attn_arbitrary_seqlen_fwd_impl(
         cudnn_frontend::DataType_t::NOT_SET,
         cudnn_frontend::DataType_t::NOT_SET,
         return_max_logit,
+        (score_mod != nullptr),
+        false,
     };
 
     namespace fe = cudnn_frontend;
@@ -333,6 +336,39 @@ void fused_attn_arbitrary_seqlen_fwd_impl(
                                                .set_stride({h, 1, 1, 1})
                                                .set_data_type(fe::DataType_t::FLOAT));
         sdpa_options.set_sink_token(softmax_offset);
+      }
+
+      // score_mod: Python callable (PyObject*) for custom attention score modification.
+      // The callable is invoked during graph construction with PyCapsule-wrapped pointers
+      // to the cuDNN frontend Graph and Tensor_attributes objects.
+      if (score_mod != nullptr) {
+        using Tensor_t = std::shared_ptr<fe::graph::Tensor_attributes>;
+        using Graph_t = std::shared_ptr<fe::graph::Graph>;
+        PyObject *py_score_mod = static_cast<PyObject *>(score_mod);
+        auto trampoline = [py_score_mod](Graph_t graph,
+                                         Tensor_t score) -> Tensor_t {
+          PyGILState_STATE gstate = PyGILState_Ensure();
+          // Wrap raw pointers as PyCapsules (non-owning; shared_ptrs manage lifetime)
+          PyObject *py_graph = PyCapsule_New(graph.get(), "fe::graph::Graph", nullptr);
+          PyObject *py_score = PyCapsule_New(score.get(), "fe::graph::Tensor_attributes", nullptr);
+          PyObject *result = PyObject_CallFunctionObjArgs(py_score_mod, py_graph, py_score, nullptr);
+          Py_DECREF(py_graph);
+          Py_DECREF(py_score);
+          Tensor_t result_tensor = score;  // default: return input score unchanged
+          if (result != nullptr) {
+            void *ptr = PyCapsule_IsValid(result, "fe::graph::Tensor_attributes")
+                            ? PyCapsule_GetPointer(result, "fe::graph::Tensor_attributes")
+                            : nullptr;
+            if (ptr != nullptr) {
+              // Wrap the raw pointer as a non-owning shared_ptr (aliasing constructor)
+              result_tensor = Tensor_t(score, static_cast<fe::graph::Tensor_attributes *>(ptr));
+            }
+            Py_DECREF(result);
+          }
+          PyGILState_Release(gstate);
+          return result_tensor;
+        };
+        sdpa_options.set_score_mod(trampoline);
       }
 
       std::shared_ptr<fe::graph::Tensor_attributes> Max, Sum_Exp;
@@ -555,13 +591,14 @@ void fused_attn_arbitrary_seqlen_bwd_impl(
     int64_t bias_sq, int64_t bias_skv, float scaling_factor, float dropout_probability,
     NVTE_QKV_Layout layout, NVTE_Bias_Type bias_type, NVTE_Mask_Type mask_type,
     NVTE_Softmax_Type softmax_type, int64_t window_size_left, int64_t window_size_right,
-    bool bottom_right_diagonal, bool deterministic, void *devPtrQ, void *devPtrKTranspose,
-    void *devPtrVTranspose, void *devPtrO, void *devPtrSoftmaxStats, void *devPtrBias,
-    void *devPtrSoftmaxOffset, void *devPtrdQ, void *devPtrdK, void *devPtrdV, void *devPtrdO,
-    void *devPtrdBias, void *devPtrdSoftmaxOffset, void *devPtrDropoutSeed,
-    void *devPtrDropoutOffset, void *devPtrCuSeqlensQ, void *devPtrCuSeqlensKV,
-    void *devPtrSeqOffsetsQ, void *devPtrSeqOffsetsKV, cudnn_frontend::DataType_t tensorType,
-    void *workspace, size_t *workspace_size, cudaStream_t stream, cudnnHandle_t handle) {
+    bool bottom_right_diagonal, bool deterministic, void *score_mod, void *score_mod_bprop,
+    void *devPtrQ, void *devPtrKTranspose, void *devPtrVTranspose, void *devPtrO,
+    void *devPtrSoftmaxStats, void *devPtrBias, void *devPtrSoftmaxOffset, void *devPtrdQ,
+    void *devPtrdK, void *devPtrdV, void *devPtrdO, void *devPtrdBias, void *devPtrdSoftmaxOffset,
+    void *devPtrDropoutSeed, void *devPtrDropoutOffset, void *devPtrCuSeqlensQ,
+    void *devPtrCuSeqlensKV, void *devPtrSeqOffsetsQ, void *devPtrSeqOffsetsKV,
+    cudnn_frontend::DataType_t tensorType, void *workspace, size_t *workspace_size,
+    cudaStream_t stream, cudnnHandle_t handle) {
   using namespace transformer_engine;
 
   bool is_bias = (bias_type == NVTE_Bias_Type::NVTE_POST_SCALE_BIAS);
@@ -644,6 +681,8 @@ void fused_attn_arbitrary_seqlen_bwd_impl(
         cudnn_frontend::DataType_t::NOT_SET,
         cudnn_frontend::DataType_t::NOT_SET,
         false,
+        (score_mod != nullptr),
+        (score_mod_bprop != nullptr),
     };
 
     namespace fe = cudnn_frontend;
@@ -880,6 +919,63 @@ void fused_attn_arbitrary_seqlen_bwd_impl(
         sdpa_backward_options.set_dsink_token(d_softmax_offset);
       }
 
+      // score_mod: Python callable (PyObject*) for custom attention score modification in forward.
+      // score_mod_bprop: Python callable for the backward of the score modification.
+      // Callables receive PyCapsule-wrapped pointers to cuDNN frontend Graph and Tensor_attributes.
+      if (score_mod != nullptr) {
+        using Tensor_t = std::shared_ptr<fe::graph::Tensor_attributes>;
+        using Graph_t = std::shared_ptr<fe::graph::Graph>;
+        PyObject *py_score_mod = static_cast<PyObject *>(score_mod);
+        auto trampoline = [py_score_mod](Graph_t graph, Tensor_t score) -> Tensor_t {
+          PyGILState_STATE gstate = PyGILState_Ensure();
+          PyObject *py_graph = PyCapsule_New(graph.get(), "fe::graph::Graph", nullptr);
+          PyObject *py_score = PyCapsule_New(score.get(), "fe::graph::Tensor_attributes", nullptr);
+          PyObject *result = PyObject_CallFunctionObjArgs(py_score_mod, py_graph, py_score, nullptr);
+          Py_DECREF(py_graph);
+          Py_DECREF(py_score);
+          Tensor_t result_tensor = score;
+          if (result != nullptr) {
+            void *ptr = PyCapsule_IsValid(result, "fe::graph::Tensor_attributes")
+                            ? PyCapsule_GetPointer(result, "fe::graph::Tensor_attributes")
+                            : nullptr;
+            if (ptr != nullptr) {
+              result_tensor = Tensor_t(score, static_cast<fe::graph::Tensor_attributes *>(ptr));
+            }
+            Py_DECREF(result);
+          }
+          PyGILState_Release(gstate);
+          return result_tensor;
+        };
+        sdpa_backward_options.set_score_mod(trampoline);
+      }
+      if (score_mod_bprop != nullptr) {
+        using Tensor_t = std::shared_ptr<fe::graph::Tensor_attributes>;
+        using Graph_t = std::shared_ptr<fe::graph::Graph>;
+        PyObject *py_score_mod_bprop = static_cast<PyObject *>(score_mod_bprop);
+        auto trampoline_bprop = [py_score_mod_bprop](Graph_t graph, Tensor_t score) -> Tensor_t {
+          PyGILState_STATE gstate = PyGILState_Ensure();
+          PyObject *py_graph = PyCapsule_New(graph.get(), "fe::graph::Graph", nullptr);
+          PyObject *py_score = PyCapsule_New(score.get(), "fe::graph::Tensor_attributes", nullptr);
+          PyObject *result =
+              PyObject_CallFunctionObjArgs(py_score_mod_bprop, py_graph, py_score, nullptr);
+          Py_DECREF(py_graph);
+          Py_DECREF(py_score);
+          Tensor_t result_tensor = score;
+          if (result != nullptr) {
+            void *ptr = PyCapsule_IsValid(result, "fe::graph::Tensor_attributes")
+                            ? PyCapsule_GetPointer(result, "fe::graph::Tensor_attributes")
+                            : nullptr;
+            if (ptr != nullptr) {
+              result_tensor = Tensor_t(score, static_cast<fe::graph::Tensor_attributes *>(ptr));
+            }
+            Py_DECREF(result);
+          }
+          PyGILState_Release(gstate);
+          return result_tensor;
+        };
+        sdpa_backward_options.set_score_mod_bprop(trampoline_bprop);
+      }
+
       auto [dQ, dK, dV] = mha_graph->sdpa_backward(q, k, v, o, dO, stats, sdpa_backward_options);
 
       dQ->set_output(true).set_dim({b, h, s_q, d_qk}).set_stride(q_stride);
@@ -1069,11 +1165,12 @@ void fused_attn_arbitrary_seqlen_fwd(
     bool return_max_logit, float attn_scale, float p_dropout, NVTE_QKV_Layout qkv_layout,
     NVTE_Bias_Type bias_type, NVTE_Mask_Type mask_type, NVTE_Softmax_Type softmax_type,
     int64_t window_size_left, int64_t window_size_right, bool bottom_right_diagonal,
-    const Tensor *input_Q, const Tensor *input_K, const Tensor *input_V, const Tensor *input_Bias,
-    const Tensor *input_SoftmaxOffset, Tensor *output_O, NVTETensorPack *Aux_CTX_Tensors,
-    const Tensor *cu_seqlens_q, const Tensor *cu_seqlens_kv, const Tensor *cu_seqlens_q_padded,
-    const Tensor *cu_seqlens_kv_padded, const Tensor *page_table_k, const Tensor *page_table_v,
-    const Tensor *rng_state, Tensor *workspace, cudaStream_t stream, cudnnHandle_t handle) {
+    void *score_mod, const Tensor *input_Q, const Tensor *input_K, const Tensor *input_V,
+    const Tensor *input_Bias, const Tensor *input_SoftmaxOffset, Tensor *output_O,
+    NVTETensorPack *Aux_CTX_Tensors, const Tensor *cu_seqlens_q, const Tensor *cu_seqlens_kv,
+    const Tensor *cu_seqlens_q_padded, const Tensor *cu_seqlens_kv_padded,
+    const Tensor *page_table_k, const Tensor *page_table_v, const Tensor *rng_state,
+    Tensor *workspace, cudaStream_t stream, cudnnHandle_t handle) {
   using namespace transformer_engine;
 
   const auto QKV_type = input_Q->data.dtype;
@@ -1208,11 +1305,11 @@ void fused_attn_arbitrary_seqlen_fwd(
       max_batch_size, max_tokens_q, max_tokens_kv, num_pages_k, num_pages_v, page_size_k,
       page_size_v, max_pages_per_seq_k, max_pages_per_seq_v, bias_b, bias_h, bias_sq, bias_skv,
       is_training, return_max_logit, attn_scale, p_dropout, qkv_layout, bias_type, mask_type,
-      softmax_type, window_size_left, window_size_right, bottom_right_diagonal, devPtrQ, devPtrK,
-      devPtrV, devPtrBias, devPtrSoftmaxOffset, devPtrS1, devPtrS2, devPtrO, devPtrDropoutSeed,
-      devPtrDropoutOffset, devPtrCuSeqlensQ, devPtrCuSeqlensKV, devPtrPageTableK, devPtrPageTableV,
-      devPtrSeqOffsetsQ, devPtrSeqOffsetsKV, get_cudnn_fe_dtype(QKV_type), workspace->data.dptr,
-      &workspace_size, stream, handle);
+      softmax_type, window_size_left, window_size_right, bottom_right_diagonal, score_mod, devPtrQ,
+      devPtrK, devPtrV, devPtrBias, devPtrSoftmaxOffset, devPtrS1, devPtrS2, devPtrO,
+      devPtrDropoutSeed, devPtrDropoutOffset, devPtrCuSeqlensQ, devPtrCuSeqlensKV, devPtrPageTableK,
+      devPtrPageTableV, devPtrSeqOffsetsQ, devPtrSeqOffsetsKV, get_cudnn_fe_dtype(QKV_type),
+      workspace->data.dptr, &workspace_size, stream, handle);
 
   if (workspace_size > 0) {
     if (workspace->data.dptr == nullptr) {
@@ -1235,13 +1332,13 @@ void fused_attn_arbitrary_seqlen_bwd(
     size_t num_tokens_kv, float attn_scale, float p_dropout, NVTE_QKV_Layout qkv_layout,
     NVTE_Bias_Type bias_type, NVTE_Mask_Type mask_type, NVTE_Softmax_Type softmax_type,
     int64_t window_size_left, int64_t window_size_right, bool bottom_right_diagonal,
-    bool deterministic, const Tensor *input_Q, const Tensor *input_K, const Tensor *input_V,
-    const Tensor *input_O, const Tensor *input_dO, const Tensor *input_Bias,
-    const Tensor *input_SoftmaxOffset, Tensor *output_S, Tensor *output_dQ, Tensor *output_dK,
-    Tensor *output_dV, Tensor *output_dBias, Tensor *output_dSoftmaxOffset,
-    const Tensor *cu_seqlens_q, const Tensor *cu_seqlens_kv, const Tensor *cu_seqlens_q_padded,
-    const Tensor *cu_seqlens_kv_padded, const Tensor *rng_state, Tensor *workspace,
-    cudaStream_t stream, cudnnHandle_t handle) {
+    bool deterministic, void *score_mod, void *score_mod_bprop, const Tensor *input_Q,
+    const Tensor *input_K, const Tensor *input_V, const Tensor *input_O, const Tensor *input_dO,
+    const Tensor *input_Bias, const Tensor *input_SoftmaxOffset, Tensor *output_S,
+    Tensor *output_dQ, Tensor *output_dK, Tensor *output_dV, Tensor *output_dBias,
+    Tensor *output_dSoftmaxOffset, const Tensor *cu_seqlens_q, const Tensor *cu_seqlens_kv,
+    const Tensor *cu_seqlens_q_padded, const Tensor *cu_seqlens_kv_padded,
+    const Tensor *rng_state, Tensor *workspace, cudaStream_t stream, cudnnHandle_t handle) {
   using namespace transformer_engine;
   const auto QKV_type = input_Q->data.dtype;
   void *devPtrQ = input_Q->data.dptr;
@@ -1306,11 +1403,12 @@ void fused_attn_arbitrary_seqlen_bwd(
       batch, num_attn_heads, num_gqa_groups, max_seqlen_q, max_seqlen_kv, head_dim_qk, head_dim_v,
       max_batch_size, max_tokens_q, max_tokens_kv, bias_b, bias_h, bias_sq, bias_skv, attn_scale,
       p_dropout, qkv_layout, bias_type, mask_type, softmax_type, window_size_left,
-      window_size_right, bottom_right_diagonal, deterministic, devPtrQ, devPtrK, devPtrV, devPtrO,
-      devPtrSoftmaxStats, devPtrBias, devPtrSoftmaxOffset, devPtrdQ, devPtrdK, devPtrdV, devPtrdO,
-      devPtrdBias, devPtrdSoftmaxOffset, devPtrDropoutSeed, devPtrDropoutOffset, devPtrCuSeqlensQ,
-      devPtrCuSeqlensKV, devPtrSeqOffsetsQ, devPtrSeqOffsetsKV, get_cudnn_fe_dtype(QKV_type),
-      workspace->data.dptr, &workspace_size, stream, handle);
+      window_size_right, bottom_right_diagonal, deterministic, score_mod, score_mod_bprop, devPtrQ,
+      devPtrK, devPtrV, devPtrO, devPtrSoftmaxStats, devPtrBias, devPtrSoftmaxOffset, devPtrdQ,
+      devPtrdK, devPtrdV, devPtrdO, devPtrdBias, devPtrdSoftmaxOffset, devPtrDropoutSeed,
+      devPtrDropoutOffset, devPtrCuSeqlensQ, devPtrCuSeqlensKV, devPtrSeqOffsetsQ,
+      devPtrSeqOffsetsKV, get_cudnn_fe_dtype(QKV_type), workspace->data.dptr, &workspace_size,
+      stream, handle);
 
   if (workspace_size > 0) {
     if (workspace->data.dptr == nullptr) {

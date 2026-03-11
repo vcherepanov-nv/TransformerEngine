@@ -1182,6 +1182,8 @@ class FusedAttnFunc(torch.autograd.Function):
         fp8_output,
         layer_number,
         return_max_logit,
+        score_mod=None,
+        score_mod_bprop=None,
     ):
         # pylint: disable=missing-function-docstring
 
@@ -1357,6 +1359,7 @@ class FusedAttnFunc(torch.autograd.Function):
                 softmax_offset,
                 return_max_logit,
                 is_graph_capturing(),
+                score_mod,
             )
             out = out_
             out_ret = out_
@@ -1446,6 +1449,8 @@ class FusedAttnFunc(torch.autograd.Function):
         )
         ctx.use_FAv2_bwd = use_FAv2_bwd
         ctx.deterministic = deterministic
+        ctx.score_mod = score_mod
+        ctx.score_mod_bprop = score_mod_bprop
 
         if return_max_logit:
             return out_ret, *max_logit
@@ -1594,6 +1599,8 @@ class FusedAttnFunc(torch.autograd.Function):
                         ctx.bottom_right_diagonal,
                         ctx.deterministic,
                         is_graph_capturing(),
+                        ctx.score_mod,
+                        ctx.score_mod_bprop,
                     )
 
                     # dq, dk, dv:             torch.Tensor; dtype = torch.float16 or torch.bfloat16
@@ -1660,6 +1667,8 @@ class FusedAttnFunc(torch.autograd.Function):
                         ctx.bottom_right_diagonal,
                         ctx.deterministic,
                         is_graph_capturing(),
+                        ctx.score_mod,
+                        ctx.score_mod_bprop,
                     )
 
         d_bias = None
@@ -1702,6 +1711,8 @@ class FusedAttnFunc(torch.autograd.Function):
             None,
             None,
             None,
+            None,  # score_mod
+            None,  # score_mod_bprop
         )
 
 
@@ -1811,6 +1822,8 @@ class FusedAttention(torch.nn.Module):
         inference_params: Optional[InferenceParams] = None,
         softmax_offset: torch.Tensor = None,
         fp8_output: bool = False,
+        score_mod=None,
+        score_mod_bprop=None,
     ) -> torch.Tensor:
         """fused attention fprop"""
         assert (
@@ -2015,6 +2028,8 @@ class FusedAttention(torch.nn.Module):
                     fp8_output,
                     self.layer_number,
                     self.return_max_logit,
+                    score_mod,
+                    score_mod_bprop,
                 )
 
         if self.return_max_logit:

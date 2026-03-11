@@ -143,6 +143,7 @@ def fused_attn_fwd(
     softmax_offset: torch.Tensor = None,
     return_max_logit: bool = False,
     cuda_graph: bool = False,
+    score_mod=None,
 ) -> Tuple[Union[torch.Tensor, None], ...]:
     """Fused Attention FWD for separate QKV input.
 
@@ -336,6 +337,7 @@ def fused_attn_fwd(
         rng_elts_per_thread,
         return_max_logit,
         cuda_graph,
+        score_mod,
     )
 
     if return_max_logit:
@@ -385,6 +387,8 @@ def fused_attn_bwd(
     bottom_right_diagonal: bool = None,
     deterministic: bool = False,
     cuda_graph: bool = False,
+    score_mod=None,
+    score_mod_bprop=None,
 ) -> Tuple[Union[torch.Tensor, None], ...]:
     """Fused Attention BWD for packed KV input.
 
@@ -540,6 +544,8 @@ def fused_attn_bwd(
         dp_quantizer,
         dqkv_quantizer,
         cuda_graph,
+        score_mod,
+        score_mod_bprop,
     )
 
     return output_tensors
