@@ -10,6 +10,8 @@ from typing import Any, Dict, Tuple, Union
 import pytest
 import torch
 
+import cudnn
+
 from transformer_engine.pytorch.quantization import FP8GlobalStateManager, get_fp8_te_dtype
 from transformer_engine.common import recipe
 from transformer_engine.pytorch import (
@@ -2854,7 +2856,7 @@ model_configs_score_mod = {
 @pytest.mark.parametrize("dtype", [torch.bfloat16])
 @pytest.mark.parametrize("model_configs", [model_configs_score_mod])
 @pytest.mark.parametrize("model", model_configs_score_mod.keys())
-def test_dpa_score_mod(dtype, model_configs, model):
+def test_dpa_score_mod_identity(dtype, model_configs, model):
     """Test DotProductAttention with score_mod=None (plumbing test).
 
     Verifies that passing score_mod=None produces the same output as not passing it,
@@ -2939,6 +2941,119 @@ def test_dpa_score_mod(dtype, model_configs, model):
     dv_sm = v.grad.clone()
 
     assert score_mod_called[0], "score_mod callable was not invoked by the cuDNN trampoline."
+
+    tols = dict(atol=1e-3, rtol=1e-3)
+    if dtype == torch.bfloat16:
+        tols = dict(atol=1.5e-2, rtol=1.5e-2)
+    torch.testing.assert_close(out_sm, out_ref, **tols)
+    torch.testing.assert_close(dq_sm, dq_ref, **tols)
+    torch.testing.assert_close(dk_sm, dk_ref, **tols)
+    torch.testing.assert_close(dv_sm, dv_ref, **tols)
+
+
+@pytest.mark.skipif(get_cudnn_version() < (9, 7, 0), reason="cuDNN 9.7.0+ is required for score_mod.")
+@pytest.mark.parametrize("dtype", [torch.bfloat16])
+@pytest.mark.parametrize("model_configs", [model_configs_score_mod])
+@pytest.mark.parametrize("model", model_configs_score_mod.keys())
+def test_dpa_score_mod_causal(dtype, model_configs, model):
+    """Test DotProductAttention with score_mod=causal mask.
+    """
+    config = model_configs[model]
+    qkv_layout = "bshd_bshd_bshd"
+    qkv_format = "bshd"
+
+    os.environ["NVTE_FLASH_ATTN"] = "0"
+    os.environ["NVTE_FUSED_ATTN"] = "1"
+    os.environ["NVTE_FUSED_ATTN_FORCE_WORKSPACE_OPT"] = "0"
+    _attention_backends["backend_selection_requires_update"] = True
+
+    available_backends, _, fused_attn_backends = get_available_attention_backends(
+        config,
+        qkv_dtype=dtype,
+        qkv_layout=qkv_layout,
+        pad_between_seqs=False,
+        is_training=True,
+        deterministic=False,
+    )
+    _, fused_attn_supported, _ = available_backends
+
+    if not fused_attn_supported or FusedAttnBackend["F16_arbitrary_seqlen"] not in fused_attn_backends:
+        pytest.skip("F16_arbitrary_seqlen backend not available.")
+
+    reset_rng_states()
+
+    b, sq, h, d = config.batch_size, config.max_seqlen_q, config.num_heads, config.head_dim_qk
+    q = (torch.randn(b, sq, h, d, dtype=dtype, device="cuda") * 0.1).detach().requires_grad_(True)
+    k = (torch.randn(b, sq, h, d, dtype=dtype, device="cuda") * 0.1).detach().requires_grad_(True)
+    v = (torch.randn(b, sq, h, d, dtype=dtype, device="cuda") * 0.1).detach().requires_grad_(True)
+    cu_seqlens = torch.arange(0, (b + 1) * sq, sq, dtype=torch.int32, device="cuda")
+    out_grad = (torch.randn(b, sq, h * d, dtype=dtype, device="cuda") * 0.01).detach()
+
+    _DUMMY_CUDA_RNG_STATE_TRACKER = CudaRNGStatesTracker()
+    _DUMMY_CUDA_RNG_STATE_TRACKER.add("model-parallel-rng", seed)
+
+    def get_dummy_cuda_rng_tracker() -> CudaRNGStatesTracker:
+        return _DUMMY_CUDA_RNG_STATE_TRACKER
+
+    block = DotProductAttention(
+        h, d,
+        attention_dropout=0.0,
+        qkv_format=qkv_format,
+        attn_mask_type=config.attn_mask_type,
+        sequence_parallel=False,
+        tp_size=1,
+        get_rng_state_tracker=get_dummy_cuda_rng_tracker,
+        tp_group=None,
+        layer_number=1,
+    ).to(dtype=dtype, device="cuda")
+
+    # Reference: run without score_mod (score_mod=None by default)
+    out_ref = block(q, k, v, qkv_format=qkv_format, cu_seqlens_q=cu_seqlens, cu_seqlens_kv=cu_seqlens,
+                    max_seqlen_q=sq, max_seqlen_kv=sq, attn_mask_type=config.attn_mask_type)
+    out_ref.backward(out_grad)
+    dq_ref = q.grad.clone()
+    dk_ref = k.grad.clone()
+    dv_ref = v.grad.clone()
+    q.grad = None
+    k.grad = None
+    v.grad = None
+
+    pygraph = cudnn.pygraph(
+        io_data_type=cudnn.data_type.HALF,
+        intermediate_data_type=cudnn.data_type.FLOAT,
+        compute_data_type=cudnn.data_type.FLOAT,
+    )
+    neg_inf_tensor_cpu = torch.full((1, 1, 1, 1), float("-inf"))
+    neg_inf_tensor = pygraph.tensor(
+        name="neg_inf_scalar",
+        dim=neg_inf_tensor_cpu.size(),
+        stride=neg_inf_tensor_cpu.stride(),
+        is_pass_by_value=True,
+        data_type=neg_inf_tensor_cpu.dtype,
+    )
+
+    def causal_mask_score_mod(graph, q_kt_tensor):
+            row_index = graph.gen_index(input=q_kt_tensor, axis=2)
+            row_index.set_data_type(cudnn.data_type.INT32)
+
+            col_index = graph.gen_index(input=q_kt_tensor, axis=3)
+            col_index.set_data_type(cudnn.data_type.INT32)
+
+            mask = graph.cmp_ge(input=row_index, comparison=col_index, compute_data_type=cudnn.data_type.BOOLEAN)
+            mask.set_data_type(cudnn.data_type.BOOLEAN)
+
+            out = graph.binary_select(input0=q_kt_tensor, input1=q_kt_tensor, mask=mask)
+            print("CAUSAL MASK!!!")
+            return out
+
+    # Run with score_mod identity callable
+    out_sm = block(q, k, v, qkv_format=qkv_format, cu_seqlens_q=cu_seqlens, cu_seqlens_kv=cu_seqlens,
+                   max_seqlen_q=sq, max_seqlen_kv=sq, attn_mask_type=config.attn_mask_type,
+                   score_mod=causal_mask_score_mod)
+    out_sm.backward(out_grad)
+    dq_sm = q.grad.clone()
+    dk_sm = k.grad.clone()
+    dv_sm = v.grad.clone()
 
     tols = dict(atol=1e-3, rtol=1e-3)
     if dtype == torch.bfloat16:
