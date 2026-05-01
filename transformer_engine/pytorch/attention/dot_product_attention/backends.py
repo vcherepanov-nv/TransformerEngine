@@ -1283,6 +1283,10 @@ class FusedAttnFunc(torch.autograd.Function):
         fp8_output,
         layer_number,
         return_max_logit,
+        score_mod,
+        score_mod_bprop,
+        score_mod_tensors,
+        score_mod_bprop_tensors,
     ):
         # pylint: disable=missing-function-docstring
 
@@ -1390,6 +1394,8 @@ class FusedAttnFunc(torch.autograd.Function):
                 bottom_right_diagonal,
                 rng_gen,
                 softmax_offset,
+                score_mod=score_mod,
+                score_mod_tensors=score_mod_tensors,
                 cuda_graph=is_graph_capturing(),
             )
 
@@ -1490,6 +1496,8 @@ class FusedAttnFunc(torch.autograd.Function):
                 softmax_offset,
                 return_max_logit,
                 is_graph_capturing(),
+                score_mod=score_mod,
+                score_mod_tensors=score_mod_tensors,
             )
             out_f16 = out_
             out_ret = out_
@@ -1587,6 +1595,10 @@ class FusedAttnFunc(torch.autograd.Function):
         )
         ctx.use_FAv2_bwd = use_FAv2_bwd
         ctx.deterministic = deterministic
+        ctx.score_mod = score_mod
+        ctx.score_mod_bprop = score_mod_bprop
+        ctx.score_mod_tensors = score_mod_tensors
+        ctx.score_mod_bprop_tensors = score_mod_bprop_tensors
 
         if return_max_logit:
             return out_ret, *max_logit
@@ -1745,6 +1757,10 @@ class FusedAttnFunc(torch.autograd.Function):
                         ctx.bottom_right_diagonal,
                         ctx.deterministic,
                         is_graph_capturing(),
+                        score_mod=ctx.score_mod,
+                        score_mod_bprop=ctx.score_mod_bprop,
+                        score_mod_tensors=ctx.score_mod_tensors,
+                        score_mod_bprop_tensors=ctx.score_mod_bprop_tensors,
                     )
                     # dq, dk, dv:             torch.Tensor; dtype = torch.float16 or torch.bfloat16
                     dq, dk, dv = dq_, dk_, dv_
@@ -1813,6 +1829,10 @@ class FusedAttnFunc(torch.autograd.Function):
                         ctx.bottom_right_diagonal,
                         ctx.deterministic,
                         is_graph_capturing(),
+                        score_mod=ctx.score_mod,
+                        score_mod_bprop=ctx.score_mod_bprop,
+                        score_mod_tensors=ctx.score_mod_tensors,
+                        score_mod_bprop_tensors=ctx.score_mod_bprop_tensors,
                     )
 
         d_bias = None
@@ -1852,6 +1872,10 @@ class FusedAttnFunc(torch.autograd.Function):
             None,
             None,
             d_softmax_offset,
+            None,
+            None,
+            None,
+            None,
             None,
             None,
             None,
@@ -1963,6 +1987,10 @@ class FusedAttention(torch.nn.Module):
         pad_between_seqs: bool = False,
         inference_params: Optional[InferenceParams] = None,
         softmax_offset: torch.Tensor = None,
+        score_mod: Optional[Callable] = None,
+        score_mod_bprop: Optional[Callable] = None,
+        score_mod_tensors: Optional[Dict[str, torch.Tensor]] = None,
+        score_mod_bprop_tensors: Optional[Dict[str, torch.Tensor]] = None,
         fp8_output: bool = False,
     ) -> torch.Tensor:
         """fused attention fprop"""
@@ -1979,6 +2007,17 @@ class FusedAttention(torch.nn.Module):
         assert (
             qkv_layout in QKVLayouts
         ), f"FusedAttention does not support qkv_layout = {qkv_layout}!"
+        has_score_mod = (
+            score_mod is not None
+            or score_mod_bprop is not None
+            or score_mod_tensors is not None
+            or score_mod_bprop_tensors is not None
+        )
+        if has_score_mod:
+            assert (
+                fused_attention_backend
+                == tex.NVTE_Fused_Attn_Backend.NVTE_F16_arbitrary_seqlen
+            ), "score_mod callbacks require the F16_arbitrary_seqlen fused backend."
 
         cp_size = 1
         if isinstance(cp_group, dist_group_type):
@@ -2060,6 +2099,7 @@ class FusedAttention(torch.nn.Module):
         use_FAv2_bwd = (
             self.use_FAv2_bwd
             and (core_attention_bias_type == "no_bias")
+            and not has_score_mod
             and (fused_attention_backend == tex.NVTE_Fused_Attn_Backend.NVTE_F16_arbitrary_seqlen)
         )
 
@@ -2087,6 +2127,7 @@ class FusedAttention(torch.nn.Module):
                         )
 
         if context_parallel:
+            assert not has_score_mod, "score_mod callbacks are not supported with context parallelism."
             assert (
                 fp8
                 or fused_attention_backend == tex.NVTE_Fused_Attn_Backend.NVTE_F16_arbitrary_seqlen
@@ -2168,6 +2209,10 @@ class FusedAttention(torch.nn.Module):
                     fp8_output,
                     self.layer_number,
                     self.return_max_logit,
+                    score_mod,
+                    score_mod_bprop,
+                    score_mod_tensors,
+                    score_mod_bprop_tensors,
                 )
 
         if self.return_max_logit:

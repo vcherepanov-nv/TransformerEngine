@@ -99,6 +99,58 @@ if is_bf16_available():
     param_types.append(torch.bfloat16)
 param_types_lean = [torch.bfloat16]
 
+
+def _get_cudnn_module():
+    import cudnn  # pylint: disable=import-outside-toplevel
+
+    return cudnn
+
+
+def _causal_score_mod(sdpa_graph, score_tensor):
+    cudnn = _get_cudnn_module()
+    row_index = sdpa_graph.gen_index(input=score_tensor, axis=2)
+    row_index.set_data_type(cudnn.data_type.INT32)
+
+    col_index = sdpa_graph.gen_index(input=score_tensor, axis=3)
+    col_index.set_data_type(cudnn.data_type.INT32)
+
+    causal_mask = sdpa_graph.cmp_ge(
+        input=row_index,
+        comparison=col_index,
+        compute_data_type=cudnn.data_type.BOOLEAN,
+    )
+    causal_mask.set_data_type(cudnn.data_type.BOOLEAN)
+
+    zero = sdpa_graph.sub(a=row_index, b=row_index, compute_data_type=cudnn.data_type.FLOAT)
+    zero.set_data_type(cudnn.data_type.FLOAT)
+
+    neg_inf = sdpa_graph.log(input=zero, compute_data_type=cudnn.data_type.FLOAT)
+    neg_inf.set_data_type(cudnn.data_type.FLOAT)
+    return sdpa_graph.binary_select(input0=score_tensor, input1=neg_inf, mask=causal_mask)
+
+
+def _causal_score_mod_external(sdpa_graph, score_tensor, score_mod_tensors):
+    cudnn = _get_cudnn_module()
+    row_index = sdpa_graph.gen_index(input=score_tensor, axis=2)
+    row_index.set_data_type(cudnn.data_type.INT32)
+
+    col_index = sdpa_graph.gen_index(input=score_tensor, axis=3)
+    col_index.set_data_type(cudnn.data_type.INT32)
+
+    causal_mask = sdpa_graph.cmp_ge(
+        input=row_index,
+        comparison=col_index,
+        compute_data_type=cudnn.data_type.BOOLEAN,
+    )
+    causal_mask.set_data_type(cudnn.data_type.BOOLEAN)
+
+    return sdpa_graph.binary_select(
+        input0=score_tensor,
+        input1=score_mod_tensors["neg_inf"],
+        mask=causal_mask,
+    )
+
+
 model_configs_base = {
     # test: ModelConfig(b, sq, hq, dqk)
     "base_1_0": ModelConfig(8, 128, 16, 64),
@@ -113,6 +165,11 @@ model_configs_base = {
     "base_5_1": ModelConfig(8, 128, 16, 512, max_seqlen_kv=2048),
     "base_6_0": ModelConfig(8, 1, 16, 1024, max_seqlen_kv=2048),
     "base_6_1": ModelConfig(8, 128, 16, 1024, max_seqlen_kv=2048),
+}
+
+model_configs_score_mod = {
+    "score_mod_0": ModelConfig(2, 512, 16, 64, attn_mask_type="no_mask"),
+    "score_mod_1": ModelConfig(4, 256, 8, 64, attn_mask_type="no_mask"),
 }
 
 
@@ -1035,6 +1092,233 @@ def test_dpa_qkv_layout_thd(dtype, model_configs, model, qkv_layout):
         test_dot_product_attention(
             dtype, model_configs, model, False, True, qkv_layout, False, pad_between_seqs
         )
+
+
+def _prepare_score_mod_test(config: ModelConfig, dtype: torch.dtype, qkv_layout: str) -> None:
+    pytest.importorskip("cudnn")
+    os.environ["NVTE_FLASH_ATTN"] = "0"
+    os.environ["NVTE_FUSED_ATTN"] = "1"
+    os.environ["NVTE_UNFUSED_ATTN"] = "1"
+    os.environ["NVTE_FUSED_ATTN_FORCE_WORKSPACE_OPT"] = "0"
+    _attention_backends["attention_params"] = None
+    _attention_backends["backend_selection_requires_update"] = True
+
+    available_backends, _, fused_attn_backends = get_available_attention_backends(
+        config,
+        qkv_dtype=dtype,
+        qkv_layout=qkv_layout,
+        pad_between_seqs=False,
+        is_training=True,
+        deterministic=False,
+    )
+    _, fused_attn_supported, _ = available_backends
+    if (
+        not fused_attn_supported
+        or FusedAttnBackend["F16_arbitrary_seqlen"] not in fused_attn_backends
+    ):
+        pytest.skip("F16_arbitrary_seqlen backend not available.")
+
+    reset_rng_states()
+
+
+def _make_score_mod_block(config: ModelConfig, dtype: torch.dtype, qkv_format: str):
+    dummy_rng_tracker = CudaRNGStatesTracker()
+    dummy_rng_tracker.add("model-parallel-rng", seed)
+
+    def get_dummy_cuda_rng_tracker() -> CudaRNGStatesTracker:
+        return dummy_rng_tracker
+
+    return DotProductAttention(
+        config.num_heads,
+        config.head_dim_qk,
+        attention_dropout=0.0,
+        qkv_format=qkv_format,
+        attn_mask_type="no_mask",
+        sequence_parallel=False,
+        tp_size=1,
+        get_rng_state_tracker=get_dummy_cuda_rng_tracker,
+        tp_group=None,
+        layer_number=1,
+    ).to(dtype=dtype, device="cuda")
+
+
+@pytest.mark.skipif(get_cudnn_version() < (9, 7, 0), reason="cuDNN 9.7.0+ is required.")
+@pytest.mark.parametrize("dtype", [torch.bfloat16])
+@pytest.mark.parametrize("model_configs", [model_configs_score_mod])
+@pytest.mark.parametrize("model", model_configs_score_mod.keys())
+def test_dpa_score_mod_identity(dtype, model_configs, model):
+    """Test DotProductAttention with an identity score_mod closure."""
+    config = model_configs[model]
+    qkv_layout = "bshd_bshd_bshd"
+    qkv_format = "bshd"
+    _prepare_score_mod_test(config, dtype, qkv_layout)
+
+    b, sq, h, d = config.batch_size, config.max_seqlen_q, config.num_heads, config.head_dim_qk
+    q = (torch.randn(b, sq, h, d, dtype=dtype, device="cuda") * 0.1).detach().requires_grad_(True)
+    k = (torch.randn(b, sq, h, d, dtype=dtype, device="cuda") * 0.1).detach().requires_grad_(True)
+    v = (torch.randn(b, sq, h, d, dtype=dtype, device="cuda") * 0.1).detach().requires_grad_(True)
+    cu_seqlens = torch.arange(0, (b + 1) * sq, sq, dtype=torch.int32, device="cuda")
+    out_grad = (torch.randn(b, sq, h * d, dtype=dtype, device="cuda") * 0.01).detach()
+    block = _make_score_mod_block(config, dtype, qkv_format)
+
+    out_ref = block(
+        q,
+        k,
+        v,
+        qkv_format=qkv_format,
+        cu_seqlens_q=cu_seqlens,
+        cu_seqlens_kv=cu_seqlens,
+        max_seqlen_q=sq,
+        max_seqlen_kv=sq,
+        attn_mask_type="no_mask",
+    )
+    out_ref.backward(out_grad)
+    dq_ref, dk_ref, dv_ref = q.grad.clone(), k.grad.clone(), v.grad.clone()
+    q.grad = k.grad = v.grad = None
+
+    score_mod_called = [False]
+
+    def identity_score_mod(_graph, _score):
+        score_mod_called[0] = True
+        return None
+
+    out_sm = block(
+        q,
+        k,
+        v,
+        qkv_format=qkv_format,
+        cu_seqlens_q=cu_seqlens,
+        cu_seqlens_kv=cu_seqlens,
+        max_seqlen_q=sq,
+        max_seqlen_kv=sq,
+        attn_mask_type="no_mask",
+        score_mod=identity_score_mod,
+    )
+    out_sm.backward(out_grad)
+
+    assert score_mod_called[0], "score_mod callable was not invoked."
+    assert _attention_backends["use_fused_attention"]
+    assert not _attention_backends["use_flash_attention"]
+    assert not _attention_backends["use_unfused_attention"]
+    assert _attention_backends["fused_attention_backend"] == FusedAttnBackend["F16_arbitrary_seqlen"]
+    tols = dict(atol=1.5e-2, rtol=1.5e-2)
+    torch.testing.assert_close(out_sm, out_ref, **tols)
+    torch.testing.assert_close(q.grad, dq_ref, **tols)
+    torch.testing.assert_close(k.grad, dk_ref, **tols)
+    torch.testing.assert_close(v.grad, dv_ref, **tols)
+
+
+@pytest.mark.skipif(get_cudnn_version() < (9, 7, 0), reason="cuDNN 9.7.0+ is required.")
+@pytest.mark.parametrize("dtype", [torch.bfloat16])
+@pytest.mark.parametrize("model_configs", [model_configs_score_mod])
+@pytest.mark.parametrize("model", model_configs_score_mod.keys())
+def test_dpa_score_mod_causal(dtype, model_configs, model):
+    """Test DotProductAttention causal masking via score_mod."""
+    config = model_configs[model]
+    qkv_layout = "bshd_bshd_bshd"
+    qkv_format = "bshd"
+    _prepare_score_mod_test(config, dtype, qkv_layout)
+
+    b, sq, h, d = config.batch_size, config.max_seqlen_q, config.num_heads, config.head_dim_qk
+    q = (torch.randn(b, sq, h, d, dtype=dtype, device="cuda") * 0.1).detach().requires_grad_(True)
+    k = (torch.randn(b, sq, h, d, dtype=dtype, device="cuda") * 0.1).detach().requires_grad_(True)
+    v = (torch.randn(b, sq, h, d, dtype=dtype, device="cuda") * 0.1).detach().requires_grad_(True)
+    cu_seqlens = torch.arange(0, (b + 1) * sq, sq, dtype=torch.int32, device="cuda")
+    out_grad = (torch.randn(b, sq, h * d, dtype=dtype, device="cuda") * 0.01).detach()
+    block = _make_score_mod_block(config, dtype, qkv_format)
+
+    out_ref = block(
+        q,
+        k,
+        v,
+        qkv_format=qkv_format,
+        cu_seqlens_q=cu_seqlens,
+        cu_seqlens_kv=cu_seqlens,
+        max_seqlen_q=sq,
+        max_seqlen_kv=sq,
+        attn_mask_type="causal",
+    )
+    out_ref.backward(out_grad)
+    dq_ref, dk_ref, dv_ref = q.grad.clone(), k.grad.clone(), v.grad.clone()
+    q.grad = k.grad = v.grad = None
+
+    out_sm = block(
+        q,
+        k,
+        v,
+        qkv_format=qkv_format,
+        cu_seqlens_q=cu_seqlens,
+        cu_seqlens_kv=cu_seqlens,
+        max_seqlen_q=sq,
+        max_seqlen_kv=sq,
+        attn_mask_type="no_mask",
+        score_mod=_causal_score_mod,
+    )
+    out_sm.backward(out_grad)
+
+    tols = dict(atol=1.5e-2, rtol=1.5e-2)
+    torch.testing.assert_close(out_sm, out_ref, **tols)
+    torch.testing.assert_close(q.grad, dq_ref, **tols)
+    torch.testing.assert_close(k.grad, dk_ref, **tols)
+    torch.testing.assert_close(v.grad, dv_ref, **tols)
+
+
+@pytest.mark.skipif(get_cudnn_version() < (9, 7, 0), reason="cuDNN 9.7.0+ is required.")
+@pytest.mark.parametrize("dtype", [torch.bfloat16])
+@pytest.mark.parametrize("model_configs", [model_configs_score_mod])
+@pytest.mark.parametrize("model", model_configs_score_mod.keys())
+@pytest.mark.parametrize("neg_inf_device", ["cuda", "cpu"], ids=["cuda_tensor", "cpu_by_value_tensor"])
+def test_dpa_score_mod_causal_external_neg_inf(dtype, model_configs, model, neg_inf_device):
+    """Test score_mod with an external variant-pack tensor."""
+    config = model_configs[model]
+    qkv_layout = "bshd_bshd_bshd"
+    qkv_format = "bshd"
+    _prepare_score_mod_test(config, dtype, qkv_layout)
+
+    b, sq, h, d = config.batch_size, config.max_seqlen_q, config.num_heads, config.head_dim_qk
+    q = (torch.randn(b, sq, h, d, dtype=dtype, device="cuda") * 0.1).detach().requires_grad_(True)
+    k = (torch.randn(b, sq, h, d, dtype=dtype, device="cuda") * 0.1).detach().requires_grad_(True)
+    v = (torch.randn(b, sq, h, d, dtype=dtype, device="cuda") * 0.1).detach().requires_grad_(True)
+    cu_seqlens = torch.arange(0, (b + 1) * sq, sq, dtype=torch.int32, device="cuda")
+    out_grad = (torch.randn(b, sq, h * d, dtype=dtype, device="cuda") * 0.01).detach()
+    neg_inf = torch.full((1, 1, 1, 1), float("-inf"), dtype=torch.float32, device=neg_inf_device)
+    block = _make_score_mod_block(config, dtype, qkv_format)
+
+    out_ref = block(
+        q,
+        k,
+        v,
+        qkv_format=qkv_format,
+        cu_seqlens_q=cu_seqlens,
+        cu_seqlens_kv=cu_seqlens,
+        max_seqlen_q=sq,
+        max_seqlen_kv=sq,
+        attn_mask_type="causal",
+    )
+    out_ref.backward(out_grad)
+    dq_ref, dk_ref, dv_ref = q.grad.clone(), k.grad.clone(), v.grad.clone()
+    q.grad = k.grad = v.grad = None
+
+    out_sm = block(
+        q,
+        k,
+        v,
+        qkv_format=qkv_format,
+        cu_seqlens_q=cu_seqlens,
+        cu_seqlens_kv=cu_seqlens,
+        max_seqlen_q=sq,
+        max_seqlen_kv=sq,
+        attn_mask_type="no_mask",
+        score_mod=_causal_score_mod_external,
+        score_mod_tensors={"neg_inf": neg_inf},
+    )
+    out_sm.backward(out_grad)
+
+    tols = dict(atol=1.5e-2, rtol=1.5e-2)
+    torch.testing.assert_close(out_sm, out_ref, **tols)
+    torch.testing.assert_close(q.grad, dq_ref, **tols)
+    torch.testing.assert_close(k.grad, dk_ref, **tols)
+    torch.testing.assert_close(v.grad, dv_ref, **tols)
 
 
 def _run_dot_product_attention(

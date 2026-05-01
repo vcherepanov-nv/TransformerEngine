@@ -311,6 +311,10 @@ struct FADescriptor_v1 {
   cudnn_frontend::DataType_t o_tensor_type;
   cudnn_frontend::DataType_t do_tensor_type;
   cudnn_frontend::DataType_t dqkv_tensor_type;
+  std::uintptr_t score_mod;
+  std::uintptr_t score_mod_bprop;
+  std::uint64_t score_mod_tensors;
+  std::uint64_t score_mod_bprop_tensors;
   bool return_max_logit;
 
   bool operator<(const FADescriptor_v1 &rhs) const {
@@ -320,7 +324,8 @@ struct FADescriptor_v1 {
                     do_format, dqkv_layout, qkv_scale_inv_format, do_scale_inv_format, mask_type,
                     softmax_type, window_size_left, window_size_right, bottom_right_diagonal,
                     deterministic, bias_type, qkv_tensor_type, o_tensor_type, do_tensor_type,
-                    dqkv_tensor_type, return_max_logit) <
+                    dqkv_tensor_type, score_mod, score_mod_bprop, score_mod_tensors,
+                    score_mod_bprop_tensors, return_max_logit) <
            std::tie(rhs.b, rhs.h, rhs.hg, rhs.s_q, rhs.s_kv, rhs.d_qk, rhs.d_v, rhs.num_pages_k,
                     rhs.num_pages_v, rhs.page_size_k, rhs.page_size_v, rhs.max_pages_per_seq_k,
                     rhs.max_pages_per_seq_v, rhs.bias_b, rhs.bias_h, rhs.bias_sq, rhs.bias_skv,
@@ -329,7 +334,8 @@ struct FADescriptor_v1 {
                     rhs.do_scale_inv_format, rhs.mask_type, rhs.softmax_type, rhs.window_size_left,
                     rhs.window_size_right, rhs.bottom_right_diagonal, rhs.deterministic,
                     rhs.bias_type, rhs.qkv_tensor_type, rhs.o_tensor_type, rhs.do_tensor_type,
-                    rhs.dqkv_tensor_type, rhs.return_max_logit);
+                    rhs.dqkv_tensor_type, rhs.score_mod, rhs.score_mod_bprop,
+                    rhs.score_mod_tensors, rhs.score_mod_bprop_tensors, rhs.return_max_logit);
   }
 };
 

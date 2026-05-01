@@ -201,7 +201,8 @@ pybind11::tuple GetFusedAttnForwardWorkspaceSizes(
         dummy_rng_state_tensor.data(), q_max_seqlen, kv_max_seqlen, is_training, false, false,
         scaling_factor, dropout_probability, qkv_layout, nvte_get_q_format(qkv_layout),
         NVTE_QKV_Format_NOT_SET, bias_type, mask_type, softmax_type, window_size_left,
-        window_size_right, bottom_right_diagonal, query_workspace_tensor.data(), nullptr);
+        window_size_right, bottom_right_diagonal, nullptr, nullptr, query_workspace_tensor.data(),
+        nullptr);
   }
 
   nvte_tensor_pack_destroy(&aux_output_tensors);
@@ -345,7 +346,7 @@ static void FusedAttnForwardImpl(
       rng_state_tensor.data(), q_max_seqlen, kv_max_seqlen, is_training, false, false,
       scaling_factor, dropout_probability, qkv_layout, nvte_get_q_format(qkv_layout),
       NVTE_QKV_Format_NOT_SET, bias_type, mask_type, softmax_type, window_size_left,
-      window_size_right, bottom_right_diagonal, workspace_tensor.data(), stream);
+      window_size_right, bottom_right_diagonal, nullptr, nullptr, workspace_tensor.data(), stream);
 
   nvte_tensor_pack_destroy(&aux_output_tensors);
 }
@@ -505,7 +506,8 @@ pybind11::tuple GetFusedAttnBackwardWorkspaceSizes(
         dropout_probability, qkv_layout, nvte_get_q_format(qkv_layout),
         nvte_get_q_format(qkv_layout), qkv_layout, NVTE_QKV_Format_NOT_SET, NVTE_QKV_Format_NOT_SET,
         bias_type, mask_type, softmax_type, window_size_left, window_size_right,
-        bottom_right_diagonal, deterministic, false, query_workspace_tensor.data(), nullptr);
+        bottom_right_diagonal, deterministic, false, nullptr, nullptr, nullptr, nullptr,
+        query_workspace_tensor.data(), nullptr);
   }
 
   nvte_tensor_pack_destroy(&aux_input_tensors);
@@ -640,7 +642,8 @@ static void FusedAttnBackwardImpl(
       scaling_factor, dropout_probability, qkv_layout, nvte_get_q_format(qkv_layout),
       nvte_get_q_format(qkv_layout), qkv_layout, NVTE_QKV_Format_NOT_SET, NVTE_QKV_Format_NOT_SET,
       bias_type, mask_type, softmax_type, window_size_left, window_size_right,
-      bottom_right_diagonal, deterministic, false, workspace_tensor.data(), stream);
+      bottom_right_diagonal, deterministic, false, nullptr, nullptr, nullptr, nullptr,
+      workspace_tensor.data(), stream);
 
   nvte_tensor_pack_destroy(&aux_input_tensors);
 }

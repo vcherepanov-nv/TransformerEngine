@@ -1732,6 +1732,10 @@ void fused_attn_fp8_fwd_impl_v1(
                                o_tensor_type,
                                cudnn_frontend::DataType_t::NOT_SET,
                                cudnn_frontend::DataType_t::NOT_SET,
+                               0,
+                               0,
+                               0,
+                               0,
                                false};
 
     namespace fe = cudnn_frontend;
@@ -2172,6 +2176,10 @@ void fused_attn_fp8_bwd_impl_v1(
                                o_tensor_type,
                                do_tensor_type,
                                dqkv_tensor_type,
+                               0,
+                               0,
+                               0,
+                               0,
                                false};
 
     namespace fe = cudnn_frontend;

@@ -890,6 +890,10 @@ class DotProductAttention(TransformerEngineBaseModule):
         fast_zero_fill: bool = True,
         inference_params: Optional[InferenceParams] = None,
         pad_between_seqs: Optional[bool] = None,
+        score_mod: Optional[Callable] = None,
+        score_mod_bprop: Optional[Callable] = None,
+        score_mod_tensors: Optional[Dict[str, torch.Tensor]] = None,
+        score_mod_bprop_tensors: Optional[Dict[str, torch.Tensor]] = None,
         fp8_output: Optional[bool] = False,
         num_splits: Optional[int] = 1,
     ) -> torch.Tensor:
@@ -1055,6 +1059,14 @@ class DotProductAttention(TransformerEngineBaseModule):
         core_attention_bias: Optional[torch.Tensor], default = None
                     Bias tensor for :math:`Q \cdot K^T`, shape ``[1, num_head, max_seqlen_q, max_seqlen_kv]``.
                     It should be ``None`` for ``"no_bias"`` and ``"alibi"`` bias types.
+        score_mod: Optional[Callable], default = None
+                    Optional cuDNN flexible-graph score modifier callback.
+        score_mod_bprop: Optional[Callable], default = None
+                    Optional cuDNN flexible-graph score modifier backward callback.
+        score_mod_tensors: Optional[Dict[str, torch.Tensor]], default = None
+                    Extra tensors exposed to score_mod via the cuDNN variant pack.
+        score_mod_bprop_tensors: Optional[Dict[str, torch.Tensor]], default = None
+                    Extra tensors exposed to score_mod_bprop via the cuDNN variant pack.
         alibi_slopes: Optional[torch.Tensor], default = None
                      ALiBi slopes in FP32 and shape ``[nheads]`` or ``[batch_size, nheads]``.
                      It adds a bias of (-alibi_slope * (i + seqlen_k - seqlen_q - j))
@@ -1439,6 +1451,10 @@ class DotProductAttention(TransformerEngineBaseModule):
                 inference_params=inference_params,
                 softmax_type=self.softmax_type,
                 return_max_logit=self.return_max_logit,
+                has_score_mod=score_mod is not None or score_mod_tensors is not None,
+                has_score_mod_bprop=(
+                    score_mod_bprop is not None or score_mod_bprop_tensors is not None
+                ),
                 cuda_graph=is_graph_capturing(),
                 num_splits=num_splits,
             )
@@ -1587,6 +1603,10 @@ class DotProductAttention(TransformerEngineBaseModule):
                         pad_between_seqs=pad_between_seqs,
                         inference_params=inference_params,
                         softmax_offset=softmax_offset,
+                        score_mod=score_mod,
+                        score_mod_bprop=score_mod_bprop,
+                        score_mod_tensors=score_mod_tensors,
+                        score_mod_bprop_tensors=score_mod_bprop_tensors,
                         fp8_output=fp8_output,
                     )
                 return self.fused_attention(
@@ -1618,6 +1638,10 @@ class DotProductAttention(TransformerEngineBaseModule):
                     pad_between_seqs=pad_between_seqs,
                     inference_params=inference_params,
                     softmax_offset=softmax_offset,
+                    score_mod=score_mod,
+                    score_mod_bprop=score_mod_bprop,
+                    score_mod_tensors=score_mod_tensors,
+                    score_mod_bprop_tensors=score_mod_bprop_tensors,
                     fp8_output=fp8_output,
                 )
 
