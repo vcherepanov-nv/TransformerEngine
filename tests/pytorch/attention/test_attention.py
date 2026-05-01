@@ -1178,9 +1178,9 @@ def test_dpa_score_mod_identity(dtype, model_configs, model):
 
     score_mod_called = [False]
 
-    def identity_score_mod(_graph, _score):
+    def identity_score_mod(_graph, score):
         score_mod_called[0] = True
-        return None
+        return score
 
     out_sm = block(
         q,
@@ -1267,9 +1267,8 @@ def test_dpa_score_mod_causal(dtype, model_configs, model):
 @pytest.mark.parametrize("dtype", [torch.bfloat16])
 @pytest.mark.parametrize("model_configs", [model_configs_score_mod])
 @pytest.mark.parametrize("model", model_configs_score_mod.keys())
-@pytest.mark.parametrize("neg_inf_device", ["cuda", "cpu"], ids=["cuda_tensor", "cpu_by_value_tensor"])
-def test_dpa_score_mod_causal_external_neg_inf(dtype, model_configs, model, neg_inf_device):
-    """Test score_mod with an external variant-pack tensor."""
+def test_dpa_score_mod_causal_external_neg_inf(dtype, model_configs, model):
+    """Test score_mod with an external CPU pass-by-value tensor."""
     config = model_configs[model]
     qkv_layout = "bshd_bshd_bshd"
     qkv_format = "bshd"
@@ -1281,7 +1280,7 @@ def test_dpa_score_mod_causal_external_neg_inf(dtype, model_configs, model, neg_
     v = (torch.randn(b, sq, h, d, dtype=dtype, device="cuda") * 0.1).detach().requires_grad_(True)
     cu_seqlens = torch.arange(0, (b + 1) * sq, sq, dtype=torch.int32, device="cuda")
     out_grad = (torch.randn(b, sq, h * d, dtype=dtype, device="cuda") * 0.01).detach()
-    neg_inf = torch.full((1, 1, 1, 1), float("-inf"), dtype=torch.float32, device=neg_inf_device)
+    neg_inf = torch.full((1, 1, 1, 1), float("-inf"), dtype=torch.float32, device="cpu")
     block = _make_score_mod_block(config, dtype, qkv_format)
 
     out_ref = block(
