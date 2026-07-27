@@ -11,7 +11,7 @@ Example:
    nsys profile \
        --capture-range=cudaProfilerApi \
        --capture-range-end=stop \
-       --trace=cuda,nvtx \
+       --trace=cuda,nvtx,osrt \
        --output=cpp_fused_attention \
        --force-overwrite=true \
        python benchmarks/attention/profile_fused_attention.py \
@@ -20,7 +20,7 @@ Example:
    nsys profile \
        --capture-range=cudaProfilerApi \
        --capture-range-end=stop \
-       --trace=cuda,nvtx \
+       --trace=cuda,nvtx,osrt \
        --output=python_fused_attention \
        --force-overwrite=true \
        python benchmarks/attention/profile_fused_attention.py \
