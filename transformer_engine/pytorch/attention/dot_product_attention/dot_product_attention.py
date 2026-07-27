@@ -6,7 +6,7 @@
 from contextlib import nullcontext
 import math
 import os
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, Union
 import warnings
 import logging
 
@@ -436,6 +436,13 @@ class DotProductAttention(TransformerEngineBaseModule):
                      and :math:`\text{max_logit}` is of shape ``[h]``.
     name : Optional[str], default = None
                 module instance name.
+    fused_attention_impl : {'cpp', 'python'}, default = 'cpp'
+                     Implementation to use after FusedAttention is selected. ``'cpp'`` uses
+                     Transformer Engine's existing compiled extension. ``'python'`` uses the
+                     cuDNN frontend Python API and currently supports only a limited FP16/BF16
+                     configuration set; unsupported configurations raise an error rather than
+                     falling back. This option does not force selection of FusedAttention over
+                     FlashAttention or UnfusedDotProductAttention.
 
     Parallelism parameters
     ----------------------
@@ -496,9 +503,15 @@ class DotProductAttention(TransformerEngineBaseModule):
         softmax_type: str = "vanilla",
         return_max_logit: Optional[bool] = False,
         name: Optional[str] = None,
+        fused_attention_impl: Literal["cpp", "python"] = "cpp",
     ) -> None:
         super().__init__(name=name)
 
+        if fused_attention_impl not in ("cpp", "python"):
+            raise ValueError(
+                "fused_attention_impl must be either 'cpp' or 'python', "
+                f"got {fused_attention_impl!r}."
+            )
         self.logger = logging.getLogger("DotProductAttention")
         self.logger.setLevel(attn_log._log_level)
         if not self.logger.hasHandlers():
@@ -562,6 +575,7 @@ class DotProductAttention(TransformerEngineBaseModule):
         self.attention_type = attention_type
         self.attention_dropout = attention_dropout
         self.return_max_logit = return_max_logit
+        self.fused_attention_impl = fused_attention_impl
 
         self.softmax_type = softmax_type
         if self.softmax_type == "vanilla":
@@ -600,6 +614,7 @@ class DotProductAttention(TransformerEngineBaseModule):
             **attn_kwargs,
             softmax_type=self.softmax_type,
             return_max_logit=self.return_max_logit,
+            fused_attention_impl=self.fused_attention_impl,
         )
 
         self.unfused_attention = UnfusedDotProductAttention(
@@ -1827,8 +1842,10 @@ class DotProductAttention(TransformerEngineBaseModule):
                         )
                     elif use_fused_attention:
                         self.logger.info(
-                            "Running with FusedAttention backend (sub-backend %s)",
+                            "Running with FusedAttention backend "
+                            "(sub-backend %s, implementation %s)",
                             int(fused_attention_backend),
+                            "python" if score_mod is not None else self.fused_attention_impl,
                         )
                     elif use_unfused_attention:
                         self.logger.info("Running with UnfusedDotProductAttention backend")
@@ -1911,6 +1928,11 @@ class DotProductAttention(TransformerEngineBaseModule):
                 return attn_out
 
             if use_fused_attention:
+                if self.fused_attention_impl == "python" and checkpoint_core_attention:
+                    raise ValueError(
+                        "fused_attention_impl='python' does not currently support "
+                        "checkpoint_core_attention=True."
+                    )
                 fu_core_attention_bias_type = core_attention_bias_type
                 fu_core_attention_bias = core_attention_bias
                 if core_attention_bias_type == "alibi" and (alibi_slopes is not None):

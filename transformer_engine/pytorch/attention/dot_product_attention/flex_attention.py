@@ -5,49 +5,23 @@
 """cuDNN-backed Flex Attention helpers."""
 
 from dataclasses import dataclass
-import importlib
 import inspect
 from typing import Any, Callable, Dict, Optional, Tuple
 
 import torch
 
-_cudnn_score_mod_handles: Dict[torch.device, Any] = {}
+from transformer_engine.pytorch.attention.dot_product_attention.cudnn_frontend import (
+    _bhsd_dim_stride,
+    _bhsd_graph_tensor,
+    _build_cudnn_pygraph,
+    _execute_cudnn_graph,
+    _finalize_cudnn_graph,
+    _import_cudnn_frontend,
+)
+
+
 _cudnn_score_mod_graph_cache: Dict[Tuple[Any, ...], Any] = {}
 _SCORE_MOD_UNCACHEABLE = object()
-
-
-def _import_cudnn_frontend():
-    """Import the cuDNN frontend Python package."""
-    try:
-        return importlib.import_module("cudnn")
-    except ImportError as exc:
-        raise ImportError(
-            "cuDNN frontend Python package not found. "
-            "Install it with: pip install nvidia-cudnn-frontend"
-        ) from exc
-
-
-def _bhsd_dim_stride(
-    tensor: torch.Tensor, tensor_format: str
-) -> Tuple[Tuple[int, ...], Tuple[int, ...]]:
-    """Describe an SBHD/BSHD tensor as cuDNN frontend's logical BHSD format."""
-    if tensor_format == "sbhd":
-        return (
-            (tensor.shape[1], tensor.shape[2], tensor.shape[0], tensor.shape[3]),
-            (tensor.stride(1), tensor.stride(2), tensor.stride(0), tensor.stride(3)),
-        )
-    if tensor_format == "bshd":
-        return (
-            (tensor.shape[0], tensor.shape[2], tensor.shape[1], tensor.shape[3]),
-            (tensor.stride(0), tensor.stride(2), tensor.stride(1), tensor.stride(3)),
-        )
-    raise ValueError(f"Flex Attention only supports SBHD/BSHD tensor formats, got {tensor_format}.")
-
-
-def _bhsd_graph_tensor(graph, tensor: torch.Tensor, tensor_format: str):
-    """Create a cuDNN graph tensor with BHSD dims and TE-layout strides."""
-    dim, stride = _bhsd_dim_stride(tensor, tensor_format)
-    return graph.tensor(dim=dim, stride=stride, data_type=tensor.dtype)
 
 
 # score_mod graph cache helpers.
@@ -192,44 +166,6 @@ def _wrap_score_mod(score_mod: Optional[Callable], graph_tensors: Dict[str, Any]
     return _wrapped_score_mod
 
 
-def _get_cudnn_current_stream_handle(cudnn, device: torch.device):
-    """Return a cuDNN handle for device, bound to PyTorch's current stream."""
-    if device.type != "cuda":
-        raise ValueError(f"Flex Attention only supports CUDA tensors, got device {device}.")
-    if device.index is None:
-        device = torch.device("cuda", torch.cuda.current_device())
-
-    handle = _cudnn_score_mod_handles.get(device)
-    with torch.cuda.device(device):
-        if handle is None:
-            handle = cudnn.create_handle()
-            _cudnn_score_mod_handles[device] = handle
-
-        stream = torch.cuda.current_stream(device).cuda_stream
-        cudnn.set_stream(handle=handle, stream=stream)
-    return handle
-
-
-def _build_cudnn_pygraph(dtype: torch.dtype, device: torch.device):
-    """Create a cuDNN frontend Python graph for F16/BF16 SDPA."""
-    cudnn = _import_cudnn_frontend()
-
-    if dtype == torch.float16:
-        io_data_type = cudnn.data_type.HALF
-    elif dtype == torch.bfloat16:
-        io_data_type = cudnn.data_type.BFLOAT16
-    else:
-        raise ValueError(f"Flex Attention only supports FP16/BF16 tensors, got {dtype}.")
-
-    graph = cudnn.pygraph(
-        io_data_type=io_data_type,
-        intermediate_data_type=cudnn.data_type.FLOAT,
-        compute_data_type=cudnn.data_type.FLOAT,
-        handle=_get_cudnn_current_stream_handle(cudnn, device),
-    )
-    return graph
-
-
 @dataclass
 class _CudnnScoreModFwdGraphEntry:
     """Cached cuDNN frontend graph and graph tensor handles for score_mod fprop."""
@@ -261,44 +197,6 @@ class _CudnnScoreModBwdGraphEntry:
     score_mod_graph_tensors: Dict[str, Any]
     score_mod_bprop_graph_tensors: Dict[str, Any]
     workspace_size: int
-
-
-def _finalize_cudnn_graph(graph) -> int:
-    """Build a cuDNN frontend Python graph and return its workspace size."""
-    cudnn = _import_cudnn_frontend()
-
-    graph.validate()
-    graph.build_operation_graph()
-    try:
-        graph.create_execution_plans([cudnn.heur_mode.A, cudnn.heur_mode.FALLBACK])
-        graph.check_support()
-    except cudnn.cudnnGraphNotSupportedError as exc:
-        raise RuntimeError(f"cuDNN Flex Attention SDPA graph is not supported: {exc}") from exc
-    graph.build_plans(cudnn.build_plan_policy.HEURISTICS_CHOICE)
-    return max(graph.get_workspace_size(), 1)
-
-
-def _execute_cudnn_graph(
-    graph,
-    variant_pack: Dict[Any, torch.Tensor],
-    workspace_size: int,
-    device: torch.device,
-):
-    """Execute a built cuDNN frontend Python graph."""
-    cudnn = _import_cudnn_frontend()
-
-    if device.type == "cuda" and device.index is None:
-        device = torch.device("cuda", torch.cuda.current_device())
-    workspace = torch.empty(
-        workspace_size,
-        device=device,
-        dtype=torch.uint8,
-    )
-    graph.execute(
-        variant_pack,
-        workspace,
-        handle=_get_cudnn_current_stream_handle(cudnn, device),
-    )
 
 
 def _cudnn_score_mod_fwd_cache_key(

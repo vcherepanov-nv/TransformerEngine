@@ -54,6 +54,9 @@ from transformer_engine.pytorch.jit import no_torch_dynamo
 from transformer_engine.pytorch.attention.dot_product_attention.context_parallel import (
     attn_forward_func_with_cp,
 )
+from transformer_engine.pytorch.attention.dot_product_attention.cudnn_attention import (
+    FusedAttentionWithPythonFrontendFunc,
+)
 from transformer_engine.pytorch.attention.dot_product_attention.flex_attention import (
     FusedAttentionWithScoreModFunc,
 )
@@ -1978,9 +1981,15 @@ class FusedAttention(torch.nn.Module):
         deterministic: bool = False,
         softmax_type: str = "vanilla",
         return_max_logit: Optional[bool] = False,
+        fused_attention_impl: str = "cpp",
     ) -> None:
         super().__init__()
 
+        if fused_attention_impl not in ("cpp", "python"):
+            raise ValueError(
+                "fused_attention_impl must be either 'cpp' or 'python', "
+                f"got {fused_attention_impl!r}."
+            )
         self.softmax_scale = softmax_scale
         self.attention_dropout = attention_dropout
         self.attention_dropout_ctx = attention_dropout_ctx
@@ -1992,6 +2001,7 @@ class FusedAttention(torch.nn.Module):
         self.deterministic = deterministic
         self.softmax_type = softmax_type
         self.return_max_logit = return_max_logit
+        self.fused_attention_impl = fused_attention_impl
 
         def remove_extra_states_check(self, incompatible_keys):  # pylint: disable=unused-argument
             """
@@ -2174,6 +2184,62 @@ class FusedAttention(torch.nn.Module):
                             cp_group[0] if cp_comm_type == "a2a+p2p" else cp_group
                         )
 
+        if self.fused_attention_impl == "python" and score_mod is None:
+            unsupported_reasons = []
+            if fused_attention_backend != FusedAttnBackend["F16_arbitrary_seqlen"]:
+                unsupported_reasons.append(
+                    "the F16/BF16 arbitrary-sequence-length cuDNN sub-backend is unavailable"
+                )
+            if any(type(x) is not torch.Tensor for x in (query_layer, key_layer, value_layer)):
+                unsupported_reasons.append("Q, K, and V are not ordinary torch.Tensor instances")
+            if len({x.dtype for x in (query_layer, key_layer, value_layer)}) != 1:
+                unsupported_reasons.append("Q, K, and V do not have the same dtype")
+            if len({x.device for x in (query_layer, key_layer, value_layer)}) != 1:
+                unsupported_reasons.append("Q, K, and V are not on the same CUDA device")
+            if q_format not in ("bshd", "sbhd") or kv_format not in ("bshd", "sbhd"):
+                unsupported_reasons.append(
+                    f"unsupported Q/KV formats ({q_format!r}, {kv_format!r})"
+                )
+            if context_parallel:
+                unsupported_reasons.append("context parallelism is enabled")
+            if is_cpu_offload_enabled():
+                unsupported_reasons.append("CPU offload is enabled")
+            if is_graph_capturing():
+                unsupported_reasons.append("CUDA graph capture is active")
+            if fp8:
+                unsupported_reasons.append("FP8 attention is enabled")
+            if fp8_output:
+                unsupported_reasons.append("FP8 output is requested")
+            if inference_params is not None:
+                unsupported_reasons.append("KV caching is enabled")
+            if pad_between_seqs:
+                unsupported_reasons.append("padding between packed sequences is enabled")
+            if attn_mask_type not in ("no_mask", "causal"):
+                unsupported_reasons.append(f"unsupported attention mask {attn_mask_type!r}")
+            expected_window_size = (-1, 0) if attn_mask_type == "causal" else (-1, -1)
+            if window_size not in (None, expected_window_size):
+                unsupported_reasons.append(f"unsupported window size {window_size!r}")
+            if attn_mask_type == "causal" and bottom_right_diagonal:
+                unsupported_reasons.append("bottom-right causal masking is enabled")
+            if attention_mask is not None:
+                unsupported_reasons.append("an explicit attention mask was provided")
+            if core_attention_bias_type != "no_bias" or core_attention_bias is not None:
+                unsupported_reasons.append("attention bias is enabled")
+            if self.softmax_type != "vanilla":
+                unsupported_reasons.append(f"softmax type is {self.softmax_type!r}")
+            if self.training and self.attention_dropout != 0.0:
+                unsupported_reasons.append(
+                    f"attention dropout is {self.attention_dropout}, expected 0.0"
+                )
+            if self.return_max_logit:
+                unsupported_reasons.append("return_max_logit is enabled")
+            if unsupported_reasons:
+                raise ValueError(
+                    "fused_attention_impl='python' does not support this configuration: "
+                    + "; ".join(unsupported_reasons)
+                    + "."
+                )
+
         if context_parallel:
             assert (
                 fp8 or fused_attention_backend == FusedAttnBackend["F16_arbitrary_seqlen"]
@@ -2232,6 +2298,18 @@ class FusedAttention(torch.nn.Module):
                 score_mod_bprop,
                 score_mod_tensors,
                 score_mod_bprop_tensors,
+                self.deterministic,
+            )
+        elif self.fused_attention_impl == "python":
+            output = FusedAttentionWithPythonFrontendFunc.apply(
+                self.training,
+                query_layer,
+                key_layer,
+                value_layer,
+                q_format,
+                kv_format,
+                self.softmax_scale,
+                attn_mask_type,
                 self.deterministic,
             )
         else:
