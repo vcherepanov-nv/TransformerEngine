@@ -11,24 +11,26 @@ Example:
    nsys profile \
        --capture-range=cudaProfilerApi \
        --capture-range-end=stop \
-       --trace=cuda,nvtx,cudnn \
+       --trace=cuda,nvtx \
        --output=cpp_fused_attention \
        --force-overwrite=true \
        python benchmarks/attention/profile_fused_attention.py \
-           --impl cpp --profile
+           --impl cpp --profile --cpu-overhead --iterations 50
 
    nsys profile \
        --capture-range=cudaProfilerApi \
        --capture-range-end=stop \
-       --trace=cuda,nvtx,cudnn \
+       --trace=cuda,nvtx \
        --output=python_fused_attention \
        --force-overwrite=true \
        python benchmarks/attention/profile_fused_attention.py \
-           --impl python --profile
+           --impl python --profile --cpu-overhead --iterations 50
 """
 
 import argparse
 import os
+import statistics
+import time
 from typing import Literal
 
 import torch
@@ -47,6 +49,14 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--warmup", type=int, default=2)
     parser.add_argument("--iterations", type=int, default=3)
     parser.add_argument("--device", type=int, default=0)
+    parser.add_argument(
+        "--cpu-overhead",
+        action="store_true",
+        help=(
+            "Synchronize outside each repeated cpu_submit NVTX range so nvtx_sum "
+            "measures host submission overhead without GPU queue backpressure."
+        ),
+    )
     parser.add_argument(
         "--profile",
         action="store_true",
@@ -179,10 +189,20 @@ def main() -> None:
     if args.profile:
         torch.cuda.cudart().cudaProfilerStart()
     start.record()
+    cpu_submit_times_ns = []
+    cpu_range_name = f"{range_name}_cpu_submit"
     torch.cuda.nvtx.range_push(range_name)
     try:
         for iteration in range(args.iterations):
-            torch.cuda.nvtx.range_push(f"{range_name}_iteration_{iteration}")
+            if args.cpu_overhead:
+                # Drain the previous iteration outside the measured CPU range. This
+                # prevents a deep GPU queue from moving backpressure into submission.
+                torch.cuda.synchronize(device)
+                iteration_range_name = cpu_range_name
+            else:
+                iteration_range_name = f"{range_name}_iteration_{iteration}"
+            torch.cuda.nvtx.range_push(iteration_range_name)
+            cpu_start_ns = time.perf_counter_ns()
             try:
                 last_output, last_grads = _run_step(
                     attention,
@@ -194,7 +214,10 @@ def main() -> None:
                     run_backward,
                 )
             finally:
+                cpu_submit_times_ns.append(time.perf_counter_ns() - cpu_start_ns)
                 torch.cuda.nvtx.range_pop()
+        if args.cpu_overhead:
+            torch.cuda.synchronize(device)
         end.record()
         torch.cuda.synchronize(device)
     finally:
@@ -209,10 +232,17 @@ def main() -> None:
 
     average_ms = start.elapsed_time(end) / args.iterations
     peak_gib = torch.cuda.max_memory_allocated(device) / 1024**3
-    print(
+    summary = (
         f"impl={args.impl} mode={args.mode} dtype={args.dtype} mask={args.mask} "
         f"shape={shape} average={average_ms:.3f} ms peak_allocated={peak_gib:.3f} GiB"
     )
+    if args.cpu_overhead:
+        cpu_submit_times_us = [duration / 1e3 for duration in cpu_submit_times_ns]
+        summary += (
+            f" cpu_submit_average={statistics.mean(cpu_submit_times_us):.3f} us"
+            f" cpu_submit_median={statistics.median(cpu_submit_times_us):.3f} us"
+        )
+    print(summary)
 
 
 if __name__ == "__main__":
