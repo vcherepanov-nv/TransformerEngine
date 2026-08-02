@@ -25,6 +25,14 @@ Example:
        --force-overwrite=true \
        python benchmarks/attention/profile_fused_attention.py \
            --impl python --profile --cpu-overhead --iterations 50
+
+Use the small shape preset to emphasize host submission overhead with short-running
+GPU kernels:
+
+.. code-block:: bash
+
+   python benchmarks/attention/profile_fused_attention.py \
+       --impl cpp --shape small --iterations 100
 """
 
 import argparse
@@ -36,13 +44,35 @@ from typing import Literal
 import torch
 
 
+SHAPE_PRESETS = {
+    "large": {
+        "batch_size": 2,
+        "sequence_length": 4096,
+        "num_heads": 128,
+        "head_dim": 128,
+    },
+    "small": {
+        "batch_size": 1,
+        "sequence_length": 128,
+        "num_heads": 1,
+        "head_dim": 64,
+    },
+}
+
+
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--impl", choices=("cpp", "python"), required=True)
-    parser.add_argument("--batch-size", type=int, default=2)
-    parser.add_argument("--sequence-length", type=int, default=4096)
-    parser.add_argument("--num-heads", type=int, default=128)
-    parser.add_argument("--head-dim", type=int, default=128)
+    parser.add_argument(
+        "--shape",
+        choices=tuple(SHAPE_PRESETS),
+        default="large",
+        help="Named shape preset. Explicit dimension options override the preset.",
+    )
+    parser.add_argument("--batch-size", type=int, default=None)
+    parser.add_argument("--sequence-length", type=int, default=None)
+    parser.add_argument("--num-heads", type=int, default=None)
+    parser.add_argument("--head-dim", type=int, default=None)
     parser.add_argument("--dtype", choices=("bf16", "fp16"), default="bf16")
     parser.add_argument("--mask", choices=("causal", "no_mask"), default="causal")
     parser.add_argument("--mode", choices=("fwd", "fwd_bwd"), default="fwd_bwd")
@@ -62,7 +92,11 @@ def _parse_args() -> argparse.Namespace:
         action="store_true",
         help="Bracket measured iterations with cudaProfilerStart/Stop for nsys capture-range.",
     )
-    return parser.parse_args()
+    args = parser.parse_args()
+    for name, value in SHAPE_PRESETS[args.shape].items():
+        if getattr(args, name) is None:
+            setattr(args, name, value)
+    return args
 
 
 def _run_step(
