@@ -1,7 +1,8 @@
 # C++ vs. Python cuDNN Fused Attention: Post-Fix Nsight Systems Report
 
 Date: 2026-08-02  
-Transformer Engine source commit: `da8b11b2`
+Transformer Engine extension source commit: `da8b11b2`
+Benchmark source commit: `dc25d6b5`
 
 ## Executive summary
 
@@ -15,6 +16,10 @@ For the profiled BF16 causal-attention workload:
 - Peak PyTorch allocation is identical for forward + backward and approximately 4 MiB lower for Python in forward-only execution.
 
 Removing zero-dropout RNG preparation makes the training comparison essentially neutral. A forward-only host-side difference of about 39 us/step remains, suggesting overhead elsewhere in the C++ wrapper rather than in cuDNN execution.
+
+Follow-up profiles without per-iteration synchronization confirm that the original 225-248 us forward GPU gaps were caused by the serialized CPU-overhead methodology. With the large shape, queued kernels are effectively contiguous. With the new small shape `(B=1, S=128, H=1, D=64)`, the cuDNN forward kernel takes only about 4.5 us and forward-plus-backward GPU work totals about 18.5 us, exposing host orchestration directly. Python is 18.0% faster for small inference forward, while C++ is 4.9% faster for small training forward plus backward.
+
+These two modes do not execute the same forward path. Forward-only runs with the module in evaluation mode under `torch.no_grad()`, while forward plus backward enables training, generates softmax statistics, saves autograd state, and uses a different cuDNN graph. The small-shape crossover is host-driven. The large-shape forward-plus-backward result is instead GPU-dominated and follows sub-1% kernel-time variation.
 
 ## Fix verification
 
@@ -37,11 +42,12 @@ Nsight confirms the intended runtime change:
 | cuDNN runtime | 9.23.0 (`torch.backends.cudnn.version() == 92300`) |
 | cuDNN frontend Python package | 1.26.0 |
 | PyTorch | 2.13.0a0+8145d630e8.nv26.06 |
-| Transformer Engine source | `da8b11b2` |
+| Transformer Engine extension source | `da8b11b2` |
+| Benchmark source | `dc25d6b5` |
 | Package-reported TE version | 2.19.0.dev0+4d4088b3 |
 | Nsight Systems | 2026.3.1.117-263137992252v0 |
 
-The package version retains its earlier editable-install metadata, while the extension was rebuilt from the source at `da8b11b2`. No other GPU processes were present before the benchmark. GPU clocks were not locked.
+The package version retains its earlier editable-install metadata, while the extension was rebuilt from the source at `da8b11b2`. The small-shape preset was added in benchmark commit `dc25d6b5`. No other GPU processes were present before the benchmark. GPU clocks were not locked.
 
 ## Workload and methodology
 
@@ -162,20 +168,91 @@ Training CPU cost is also at parity: the average submission difference is 0.32%,
 
 Forward-only Python execution retains a measurable host advantage of approximately 39 us/step. Since kernel count, launch API time, and GPU time now match, this difference lies in wrapper-level work before and around cuDNN execution. The repeated native workspace/auxiliary query in the C++ wrapper is a likely contributor, but the current ranges do not provide an exclusive breakdown.
 
+## Queued-execution follow-up
+
+The initial profiles intentionally used `--cpu-overhead` to isolate host submission cost. A second round removed that flag to model normal asynchronous execution more closely. These runs retain one synchronization after the complete measured loop, but do not synchronize between iterations. The CPU can therefore prepare and queue later operations while the GPU executes earlier ones.
+
+Both large-shape implementations used 5 warmups and 50 measured iterations. The small-shape runs used 5 warmups and 100 measured iterations. All runs remained BF16, BSHD, top-left causal, and zero-dropout.
+
+### Large shape with queued execution
+
+| Mode | Implementation | Step time (ms) | CPU iteration (us) | GPU kernels (us/step) | Inter-kernel gap avg / median (us) |
+|---|---|---:|---:|---:|---:|
+| Forward | C++ | 0.793642 | 305.049 | 778.073 | 0.262 / 0.256 |
+| Forward | Python | 0.799175 | 265.803 | 785.328 | 0.263 / 0.256 |
+| Forward + backward | C++ | 3.540529 | 621.834 | 3,523.344 | 0.381 / 0.288 |
+| Forward + backward | Python | 3.551236 | 611.290 | 3,534.819 | 0.273 / 0.288 |
+
+Removing per-iteration synchronization collapses the earlier forward GPU bubbles from 251.952 us average for C++ and 233.099 us for Python to approximately 0.26 us in both paths. Forward-plus-backward kernels are also effectively contiguous. The CPU queues work tens of milliseconds ahead of the device, so host differences are hidden by GPU execution.
+
+Python's large-shape CPU iteration is 12.9% lower in forward and 1.7% lower in forward plus backward. Nevertheless, Python's measured GPU kernel totals are 7.255 us and 11.475 us higher, respectively. The end-to-end differences closely follow those GPU differences: 5.533 us in forward and 10.707 us in forward plus backward. These sub-1% kernel differences are within the observed run-to-run and per-kernel variation, so the large queued results are not evidence that the C++ backward wrapper is intrinsically faster.
+
+### Small shape with queued execution
+
+The small preset is `(batch=1, sequence=128, heads=1, head_dim=64)`. It minimizes the amount of device work while retaining a conventional cuDNN-supported attention tile. The generated forward kernel takes approximately 4.5 us, making host orchestration the throughput limiter.
+
+| Mode | Implementation | Step time (ms) | CPU iteration avg / median (us) | GPU kernels (us/step) | Python vs. C++ step time |
+|---|---|---:|---:|---:|---:|
+| Forward | C++ | 0.299259 | 295.777 / 291.922 | 4.629 | - |
+| Forward | Python | 0.245501 | 241.908 / 230.754 | 4.540 | **-18.0%** |
+| Forward + backward | C++ | 0.635569 | 631.457 / 617.605 | 18.521 | - |
+| Forward + backward | Python | 0.666541 | 662.722 / 650.292 | 18.539 | **+4.9%** |
+
+The device work is at parity. Python's forward kernel is 0.089 us shorter, and its complete forward-plus-backward kernel sequence is only 0.018 us longer. Neither difference can explain the tens of microseconds in step time.
+
+Forward-only inter-kernel gaps average 290.445 us for C++ and 234.312 us for Python, with medians of 290.690 us and 229.858 us. These gaps are host submission intervals: unlike the large shape, the CPU cannot enqueue the next step before the short kernel finishes.
+
+The forward-plus-backward gap distribution is bimodal because two of the three backward-kernel transitions are internal to a single cuDNN graph execution. The overall means are 152.353 us for C++ and 160.285 us for Python, while the medians are only 18.976 us and 18.944 us. A phase breakdown is more informative:
+
+| Host/GPU interval | C++ avg (us) | Python avg (us) | Python - C++ (us) |
+|---|---:|---:|---:|
+| Iteration start to training-forward kernel | 276.497 | 300.937 | +24.440 |
+| Forward kernel end to first backward kernel | 250.661 | 265.279 | +14.618 |
+| First-to-second backward-kernel gap | 8.364 | 8.785 | +0.421 |
+| Second-to-third backward-kernel gap | 0.272 | 0.290 | +0.018 |
+| Last backward kernel end to iteration end | 77.142 | 68.892 | -8.250 |
+| Between iteration NVTX ranges | 2.959 | 2.933 | -0.026 |
+
+The approximately 31 us net difference from these phases matches the observed CPU-iteration and step-time difference.
+
+### Why inference forward favors Python but training favors C++
+
+The benchmark couples execution mode and autograd behavior:
+
+- `mode=fwd` sets `run_backward=False`, puts `DotProductAttention` in evaluation mode, disables input gradients, and calls attention under `torch.no_grad()`.
+- `mode=fwd_bwd` sets `run_backward=True`, puts the module in training mode, enables input gradients, and invokes `torch.autograd.grad` after forward.
+
+Forward plus backward is therefore not simply the forward-only operation followed by a backward operation. Its forward graph generates softmax statistics, returns auxiliary tensors, and saves training state. The two modes can have different host-side rankings even before backward begins.
+
+For inference forward, the cached Python path is relatively lean. It allocates the output, constructs and looks up the graph-cache key, builds a four-entry variant pack, allocates workspace, and calls `graph.execute`. It skips the training statistics tensor. The generic C++ wrapper still constructs Transformer Engine tensor wrappers and an auxiliary tensor pack, creates its ABI-required RNG-state tensor, calls the native fused-attention API once to query auxiliary/workspace requirements, allocates the returned buffers, and calls the native API again to execute. The small trace splits the inference-forward advantage as follows:
+
+| Inference-forward interval | C++ avg (us) | Python avg (us) | Python - C++ (us) |
+|---|---:|---:|---:|
+| Iteration start to kernel | 244.398 | 215.134 | -29.264 |
+| Kernel end to iteration end | 46.750 | 22.234 | -24.516 |
+| Total CPU iteration | 295.777 | 241.908 | -53.869 |
+
+In training, the Python implementation allocates the softmax-statistics tensor, includes it in a larger cache key and variant pack, and saves five tensors for autograd. Its backward method makes `d_out` contiguous, allocates `dQ`, `dK`, and `dV`, constructs a backward cache key from the metadata of Q, K, V, O, dO, and statistics, builds a nine-entry variant pack, allocates another workspace, obtains the current-stream cuDNN handle, and executes the cached backward graph.
+
+The C++ path is also generic and still performs workspace queries and buffer allocation, including two native fused-attention calls in backward. However, much of its tensor metadata, layout handling, auxiliary wrapping, gradient allocation, and native argument preparation executes in compiled C++ rather than as per-call Python object and dictionary manipulation. The small trace is consistent with that compiled orchestration offsetting the C++ forward-query cost during training.
+
+The current NVTX ranges establish where the extra time occurs but do not exclusively attribute each microsecond to cache-key creation, allocation, autograd bookkeeping, or graph execution. Phase-specific sibling NVTX ranges would be required for an exclusive breakdown.
+
 ## Limitations and follow-up
 
-- This is one GB200, one shape, BF16, BSHD, and causal masking. It does not establish performance across the Python path's full supported matrix.
-- Each configuration was profiled once for 50 iterations. Per-kernel distributions are available, but runs were not repeated or counterbalanced.
+- This is one GB200, two shapes, BF16, BSHD, and causal masking. It does not establish performance across the Python path's full supported matrix.
+- Each configuration was profiled once: 50 iterations for the large shape and 100 for the small shape. Per-kernel distributions are available, but runs were not repeated or counterbalanced.
 - GPU clocks were not fixed, so sub-1% differences are not strong evidence of a speedup or regression.
 - Graph construction and cuDNN plan selection are intentionally excluded; results describe warm-cache steady state.
 - Per-step synchronization isolates host overhead but differs from a deeply queued throughput workload.
+- The benchmark currently couples forward-only with evaluation mode and forward-plus-backward with training mode. A training-forward-only mode is needed for a strict additive forward/backward comparison.
 - Nsight tracing adds overhead. Comparisons are matched, but absolute CPU times should not be treated as uninstrumented production latency.
 
-Useful follow-up work would add NVTX ranges for C++ and Python wrapper phases, repeat profiles in counterbalanced order, and cover unmasked attention, FP16, smaller sequence lengths, and GQA shapes.
+Useful follow-up work would decouple training mode from backward execution, add NVTX ranges for C++ and Python cache-key construction, allocation, workspace query, graph execution, and autograd-return phases, repeat profiles in counterbalanced order, and cover unmasked attention, FP16, other sequence lengths, and GQA shapes.
 
 ## Artifacts
 
-The recreated reports and SQLite exports are under `/tmp/te_attention_profiles`:
+The recreated reports and SQLite exports are under `/tmp/te_attention_profiles`. The serialized CPU-overhead profiles are:
 
 ```text
 cpp_fwd.nsys-rep
@@ -183,6 +260,26 @@ python_fwd.nsys-rep
 cpp_fwd_bwd.nsys-rep
 python_fwd_bwd.nsys-rep
 ```
+
+The queued large-shape profiles are:
+
+```text
+cpp_fwd_throughput.nsys-rep
+python_fwd_throughput.nsys-rep
+cpp_fwd_bwd_throughput.nsys-rep
+python_fwd_bwd_throughput.nsys-rep
+```
+
+The queued small-shape profiles are:
+
+```text
+cpp_fwd_small_throughput.nsys-rep
+python_fwd_small_throughput.nsys-rep
+cpp_fwd_bwd_small_throughput.nsys-rep
+python_fwd_bwd_small_throughput.nsys-rep
+```
+
+Each profile has a matching fresh SQLite export in the same directory.
 
 The fresh SQLite exports and summary tables were generated with:
 
