@@ -178,6 +178,51 @@ def test_python_frontend_does_not_fall_back_for_unsupported_configuration():
         )
 
 
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA is required.")
+@pytest.mark.skipif(get_cudnn_version() < (9, 6, 0), reason="cuDNN 9.6.0+ is required.")
+@pytest.mark.parametrize("is_training", [True, False])
+def test_cpp_zero_dropout_does_not_advance_cuda_rng(is_training):
+    """Zero-dropout C++ fused attention should not reserve Philox state."""
+    batch_size, seqlen, num_heads, head_dim = 2, 16, 2, 64
+    q, k, v = [
+        torch.ones(
+            (batch_size, seqlen, num_heads, head_dim),
+            dtype=torch.float16,
+            device="cuda",
+            requires_grad=is_training,
+        )
+        for _ in range(3)
+    ]
+    cu_seqlens = torch.arange(
+        0,
+        (batch_size + 1) * seqlen,
+        seqlen,
+        dtype=torch.int32,
+        device="cuda",
+    )
+    attention = FusedAttention(
+        head_dim**-0.5,
+        attention_dropout=0.0,
+        fused_attention_impl="cpp",
+    ).cuda().train(is_training)
+    kwargs = {
+        "qkv_layout": "bshd_bshd_bshd",
+        "cu_seqlens_q": cu_seqlens,
+        "cu_seqlens_kv": cu_seqlens,
+        "attn_mask_type": "no_mask",
+        "window_size": (-1, -1),
+        "fused_attention_backend": FusedAttnBackend["F16_arbitrary_seqlen"],
+    }
+
+    # Warm up graph construction before observing the generator state.
+    attention(q, k, v, **kwargs)
+    rng_state_before = torch.cuda.get_rng_state()
+    attention(q, k, v, **kwargs)
+    rng_state_after = torch.cuda.get_rng_state()
+
+    torch.testing.assert_close(rng_state_after, rng_state_before, rtol=0, atol=0)
+
+
 _gpu_dtypes = [torch.float16]
 if torch.cuda.is_available() and is_bf16_available():
     _gpu_dtypes.append(torch.bfloat16)

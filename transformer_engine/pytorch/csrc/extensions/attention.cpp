@@ -227,13 +227,16 @@ std::vector<py::object> fused_attn_fwd(
                                     DType::kFloat32, nullptr, nullptr, nullptr);
   }
 
-  // extract rng seed and offset
-  auto gen = at::get_generator_or_default<at::CUDAGeneratorImpl>(
-      rng_gen, at::cuda::detail::getDefaultCUDAGenerator());
-  at::PhiloxCudaState philox_args = init_philox_state(gen, rng_elts_per_thread);
+  // Materialize the RNG state only when attention dropout is active. The RNG tensor remains part
+  // of the auxiliary-tensor ABI even without dropout, but cuDNN does not read it in that case.
   auto options = torch::TensorOptions().dtype(torch::kInt64).device(torch::kCUDA);
   auto rng_state = torch::empty({2}, options);
-  philox_unpack(philox_args, static_cast<int64_t *>(rng_state.data_ptr()));
+  if (is_training && p_dropout != 0.0f) {
+    auto gen = at::get_generator_or_default<at::CUDAGeneratorImpl>(
+        rng_gen, at::cuda::detail::getDefaultCUDAGenerator());
+    at::PhiloxCudaState philox_args = init_philox_state(gen, rng_elts_per_thread);
+    philox_unpack(philox_args, static_cast<int64_t *>(rng_state.data_ptr()));
+  }
   auto te_rng_state = makeTransformerEngineTensor(rng_state);
 
   // create auxiliary output tensors
