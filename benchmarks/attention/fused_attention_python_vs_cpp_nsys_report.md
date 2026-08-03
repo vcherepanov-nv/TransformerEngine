@@ -90,13 +90,151 @@ nsys profile \
 
 `--cpu-overhead` synchronizes before each measured submission, with synchronization outside the `cpu_submit` NVTX range. This prevents GPU queue backpressure from being charged to CPU submission and makes the run a serialized latency measurement. Warmup constructs and caches cuDNN graphs before capture.
 
-Metric definitions:
+## Metric definitions and calculations
 
-- Step latency is the benchmark's CUDA-event elapsed time divided by 50.
-- CPU submit is `perf_counter_ns` around the Python forward or forward-plus-autograd call; it excludes pre-step synchronization.
-- CUDA launch API time is `cuLaunchKernelEx` time from `cuda_api_sum`, divided by 50.
-- GPU kernel time is the sum of `cuda_gpu_kern_sum`, divided by 50.
-- Peak memory is reported by PyTorch's CUDA caching allocator.
+All profile-derived timestamps are in nanoseconds on Nsight Systems' unified timeline unless stated otherwise. `N` is the number of measured iterations: 50 for the large shape and 100 for the small shape. Warmup is outside every reported measurement.
+
+### Step latency and step time
+
+The benchmark records CUDA events immediately before and after the complete measured loop. After synchronizing the device, it calculates:
+
+```text
+CUDA-event step latency (ms) = start.elapsed_time(end) / N
+```
+
+The `average=... ms` printed by the benchmark and the initial serialized `Step latency` table use this measurement. It is one aggregate makespan divided by `N`, not the mean of `N` independently timed steps, so it has no per-step median. CUDA events measure the device-stream timeline. GPU execution and GPU-idle periods caused by late host submission between the events are included; warmup and work outside the events are excluded.
+
+The benchmark also places one outer NVTX range around the complete measured loop and its final synchronization. For the queued large- and small-shape tables, the six-decimal `Step time` values are calculated from this range:
+
+```text
+outer NVTX step time (ms) = (outer_end_ns - outer_start_ns) / 1,000,000 / N
+```
+
+This is end-to-end host wall-clock makespan per iteration. It includes host submission, device execution, host-induced GPU gaps, and the final queue drain. It excludes warmup and graph construction. The final synchronization is necessary to include completion of all queued work; its trailing CPU return overhead is also inside the outer range. The report gives a separate outer-NVTX table for the serialized runs to cross-check the CUDA-event measurement. The two methods agree closely, with small differences from their exact start/end envelopes and timestamp domains.
+
+For queued execution, step time is approximately the slower of steady-state host submission cadence and GPU service time, plus startup and final-drain overhead amortized over `N`. CPU and GPU work can overlap, so step time is not calculated by adding CPU iteration time and GPU kernel time.
+
+### Direct CPU submission time
+
+Every call to `_run_step` is bracketed with `time.perf_counter_ns()`:
+
+```text
+direct_cpu_i_us = (perf_counter_end_i_ns - perf_counter_start_i_ns) / 1,000
+CPU submit average = arithmetic mean(direct_cpu_i_us)
+CPU submit median = median(direct_cpu_i_us)
+```
+
+The initial serialized `CPU submit avg / median` values come from these direct benchmark timers. With `--cpu-overhead`, `torch.cuda.synchronize()` runs before the timer and before the `cpu_submit` NVTX range, so the metric excludes the deliberate pre-step synchronization. It includes the Python attention call and, in forward-plus-backward mode, `torch.autograd.grad`, along with any CUDA API blocking or OS scheduling encountered inside that interval. It measures host wall time, not CPU cycles or exclusive on-core execution.
+
+The script records the same direct timer in queued mode but does not print it unless `--cpu-overhead` is set, so the queued tables use the persisted NVTX iteration ranges described below.
+
+### NVTX CPU submission and CPU iteration
+
+In serialized mode, all measured calls use the `..._cpu_submit` NVTX name. Nsight's `nvtx_sum` groups those ranges and reports their count, total, mean, median, minimum, maximum, and standard deviation. The report cites the NVTX mean separately as an independent check of the direct CPU timer. The NVTX envelope starts just before `perf_counter_ns()` and ends just after the direct duration is appended, so it is slightly wider than the direct timer.
+
+In queued mode, each call uses a unique `..._iteration_<index>` NVTX range. The `CPU iteration` columns are calculated directly from those ranges:
+
+```text
+cpu_iteration_i_us = (iteration_end_i_ns - iteration_start_i_ns) / 1,000
+CPU iteration average = arithmetic mean(cpu_iteration_i_us)
+CPU iteration median = median(cpu_iteration_i_us)
+```
+
+All `N` ranges are included, including the first captured iteration. The range includes forward, optional autograd/backward submission, replacement and release of the previous returned objects, the two `perf_counter_ns()` calls, and appending the direct duration. It excludes iteration-name construction, the NVTX push call itself, final CUDA-event handling, and final synchronization. Because no per-iteration synchronization is present, it normally measures asynchronous submission rather than GPU completion, except where a CUDA API or queue backpressure blocks the host.
+
+The equivalent SQLite selection is:
+
+```sql
+SELECT n.start, n.end
+FROM NVTX_EVENTS AS n
+LEFT JOIN StringIds AS s ON s.id = n.textId
+WHERE COALESCE(n.text, s.value) LIKE '%_iteration_%'
+ORDER BY n.start;
+```
+
+### CUDA launch API time
+
+CUDA runtime/driver calls come from `CUPTI_ACTIVITY_KIND_RUNTIME`, summarized by `cuda_api_sum`. For each `cuLaunchKernelEx` call:
+
+```text
+launch_api_duration_us = (api_end_ns - api_start_ns) / 1,000
+CUDA launch API us/step = sum(all cuLaunchKernelEx durations) / N / 1,000
+```
+
+The result is total launch-API wall time per benchmark step, not average time per launch. These are host API durations; they do not include later kernel execution. Forward has one launch per step after the RNG fix, while forward plus backward has four.
+
+### GPU kernel time and per-kernel statistics
+
+Kernel events come from `CUPTI_ACTIVITY_KIND_KERNEL` and are also summarized by `cuda_gpu_kern_sum`. Each kernel duration is:
+
+```text
+kernel_duration_us = (kernel_end_ns - kernel_start_ns) / 1,000
+GPU kernel time per step = sum(all kernel durations) / N
+```
+
+Kernels execute on one CUDA stream in these profiles, so summing durations does not double-count overlap. Mean, median, minimum, maximum, and standard deviation for a kernel role are calculated over all instances with the same demangled kernel name. The role-specific forward and backward tables use the mean emitted by `cuda_gpu_kern_sum`. `GPU kernels` is device-busy kernel time only: host submission, launch API time, GPU-idle gaps, CUDA events, and synchronization are excluded.
+
+### Kernel counts and removed-kernel verification
+
+`Kernels/step` is:
+
+```text
+kernel instances in CUPTI_ACTIVITY_KIND_KERNEL / N
+```
+
+The Python-vs.-C++ row shows the arithmetic count difference, not a percentage. Verification of the removed RNG kernel searches captured kernel names for `extract_seed_and_offset` and reports the number of matching instances. A zero count in both paths establishes that the former C++-only kernel is absent from the captured ranges.
+
+### Inter-kernel gaps
+
+Kernel events are ordered by GPU start timestamp. For each adjacent pair on the captured device and stream:
+
+```text
+gap_i_us = (next_kernel_start_ns - previous_kernel_end_ns) / 1,000
+gap average = arithmetic mean(gap_i_us)
+gap median = median(gap_i_us)
+```
+
+The interval before the first kernel and after the last kernel is not included. Therefore, 50 forward kernels produce 49 gaps, 200 large forward-plus-backward kernels produce 199 gaps, 100 small forward kernels produce 99 gaps, and 400 small forward-plus-backward kernels produce 399 gaps.
+
+Forward-plus-backward gaps are additionally classified by their position in the repeating four-kernel sequence: forward-to-first-backward, first-to-second backward, second-to-third backward, and last-backward-to-next-forward step boundary. The overall small-shape median is low because slightly more than half of adjacent transitions are short intra-cuDNN-graph gaps; the mean reflects the long host-driven transitions as well.
+
+### Cross CPU/GPU phase intervals
+
+Nsight places CPU NVTX and GPU kernel timestamps on a unified timeline. Each iteration range is paired with its ordered group of one forward kernel or four forward-plus-backward kernels. The phase table uses direct timestamp subtraction:
+
+```text
+pre-forward = first_kernel_start - iteration_range_start
+forward-to-backward = first_backward_start - forward_kernel_end
+backward internal gap = next_backward_start - previous_backward_end
+post-backward = iteration_range_end - last_kernel_end
+between iteration ranges = next_iteration_start - previous_iteration_end
+```
+
+These intervals include all host work, API calls, scheduling, and idle time between their endpoints. They localize overhead but do not exclusively assign it to cache lookup, allocation, Python execution, autograd, or cuDNN without narrower sibling NVTX ranges.
+
+### Peak PyTorch allocation
+
+Immediately before measurement, the benchmark calls `torch.cuda.reset_peak_memory_stats()`. After completion it calculates:
+
+```text
+peak allocation GiB = torch.cuda.max_memory_allocated(device) / 1024^3
+```
+
+This is PyTorch caching-allocator memory actively allocated at the high-water mark, not reserved capacity, device-wide free memory, or an incremental allocation attributable only to attention. Resetting peak statistics preserves the current baseline allocation, so inputs and other live tensors that already exist at reset remain part of the reported peak.
+
+### Percentage comparisons
+
+Unless explicitly labeled as a count difference, every `Python vs. C++` percentage uses:
+
+```text
+percentage delta = (Python value - C++ value) / C++ value * 100
+```
+
+A negative timing or memory percentage means Python measured lower; a positive value means Python measured higher. Percentages are calculated from unrounded values where available, then rounded for display.
+
+### OS-runtime totals
+
+OS runtime calls come from `OSRT_API` and `osrt_sum`. Counts are the number of captured calls with the same API name, and total time is the sum of `end - start` over those calls across all captured threads. These multi-thread cumulative totals can exceed benchmark wall time and are reported only to compare runtime behavior. They are not divided into, or added to, step latency.
 
 ## Results
 
