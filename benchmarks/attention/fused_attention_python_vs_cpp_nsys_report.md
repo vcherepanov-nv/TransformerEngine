@@ -427,3 +427,190 @@ nsys stats \
     --report nvtx_sum,cuda_gpu_kern_sum,cuda_api_sum,osrt_sum \
     /tmp/te_attention_profiles/<report>.nsys-rep
 ```
+
+## Graph-build follow-up: aligned C++ and Python paths (2026-08-08)
+
+This follow-up measures warmed-process, cold-TE-cache cuDNN graph construction after
+commit `d23ffc756c547591e9dcadb56ef8205e8ebfa7da` aligned the two paths' attention-scale
+representation and added equivalent graph-build NVTX stages. It is separate from the
+steady-state execution results above.
+
+Three profiles distinguish frontend-language overhead from heuristic-policy overhead:
+
+1. C++ with its normal `heur_mode.A` policy.
+2. Python with `--match-cpp-graph-build`, which also uses only `heur_mode.A`.
+3. Python with its production `heur_mode.A + heur_mode.FALLBACK` policy.
+
+The match option affects only this benchmark. Production Python retains `A + FALLBACK`
+for broader engine coverage. Both TE implementations now describe attention scale as a
+rank-4 FP32 pass-by-value tensor backed by a host scalar, so the matched profiles no
+longer compare an explicit C++ input with an embedded Python scalar attribute.
+
+### Environment and methodology
+
+| Component | Value |
+|---|---|
+| GPU | NVIDIA GB200, device 0 (189,471 MiB; four GB200s visible) |
+| Driver | 595.84.01 |
+| CUDA | 13.3 |
+| cuDNN runtime | 9.24.0 (`torch.backends.cudnn.version() == 92400`) |
+| cuDNN frontend Python package | 1.27.0 |
+| PyTorch | 2.13.0a0+9186a08b2c.nv26.07 |
+| Nsight Systems | 2026.3.1.117-263137992252v0 |
+| TE source | `d23ffc756c547591e9dcadb56ef8205e8ebfa7da` |
+
+All runs used the small BF16, BSHD, top-left-causal shape `(B=1, S=128, H=1,
+D=64)`, training forward plus backward, five warmups, and 30 measured trials. Each
+measured trial clears the selected TE graph cache, constructs a training-forward graph
+and a backward graph, executes them, and synchronizes afterward. The reported graph
+ranges contain host graph construction only; the synchronization and GPU execution are
+outside them. The three profiles were captured once, in C++, matched-Python,
+production-Python order, without locked GPU clocks.
+
+The command template was:
+
+```bash
+nsys profile \
+    --capture-range=cudaProfilerApi \
+    --capture-range-end=stop \
+    --trace=cuda,nvtx \
+    --sample=none \
+    --output=<report> \
+    --force-overwrite=true \
+    python benchmarks/attention/profile_fused_attention.py \
+        --impl <cpp|python> \
+        --measure graph_creation \
+        --shape small \
+        --mode fwd_bwd \
+        --warmup 5 \
+        --iterations 30 \
+        --profile \
+        [--match-cpp-graph-build]
+```
+
+### End-to-end graph-build results
+
+Times are Nsight NVTX CPU wall-clock durations in milliseconds. `Fwd` is the
+statistics-producing training-forward graph, not the inference graph. Average and
+median are both shown because one Python backward IR-definition sample was an outlier:
+3.934 ms in the matched run versus a 0.183 ms median.
+
+| Direction | C++ `A` avg / median | Python `A` avg / median | Matched Python - C++ avg / median | Python `A+FALLBACK` avg / median | `FALLBACK` increment avg / median |
+|---|---:|---:|---:|---:|---:|
+| Fwd | 26.416 / 26.460 | 27.006 / 26.997 | +0.590 / +0.537 | 27.392 / 27.288 | +0.386 / +0.291 |
+| Bwd | 30.199 / 30.217 | 31.208 / 31.027 | +1.010 / +0.810 | 33.016 / 32.760 | +1.808 / +1.733 |
+
+With graph representation and heuristic mode matched, Python's median overhead is
+0.537 ms (2.0%) for forward and 0.810 ms (2.7%) for backward. The normal Python
+`FALLBACK` query raises the median difference from C++ to 0.828 ms (3.1%) and
+2.543 ms (8.4%), respectively.
+
+### Matched-policy stage breakdown
+
+The following table uses medians. The stages are sibling ranges inside the inclusive
+`cudnn_graph_build_*` range, except that materialization contains the frontend-specific
+definition and validation subranges. Per-stage medians do not have to add exactly to
+the median of the enclosing range.
+
+| Stage | C++ fwd | Python fwd | Fwd delta | C++ bwd | Python bwd | Bwd delta |
+|---|---:|---:|---:|---:|---:|---:|
+| Materialization + validation | 0.038 | 0.238 | +0.200 | 0.030 | 0.329 | +0.300 |
+| Build operation graph | 0.443 | 0.456 | +0.014 | 1.032 | 1.053 | +0.021 |
+| Create execution plans | 1.732 | 1.828 | +0.096 | 2.918 | 3.004 | +0.086 |
+| Check support | 0.024 | 0.032 | +0.008 | 0.022 | 0.031 | +0.010 |
+| Build plans | 24.208 | 24.394 | +0.186 | 26.212 | 26.550 | +0.338 |
+| **Inclusive graph build** | **26.460** | **26.997** | **+0.537** | **30.217** | **31.027** | **+0.810** |
+
+Plan construction dominates both paths: `build_plans` accounts for about 24.2 ms of
+forward build time and 26.2-26.6 ms of backward build time. Once the graph has been
+lowered, `build_operation_graph` is within 0.014-0.021 ms and the matched heuristic
+query is within 0.086-0.096 ms. These close native-stage results are evidence that the
+large original difference was not primarily a different cuDNN backend implementation.
+
+The materialization subranges expose work that cannot be named identically because the
+public APIs have different architectures:
+
+| Direction | C++ native definition | C++ native validation | Python IR definition | Python lowering + native validation |
+|---|---:|---:|---:|---:|
+| Fwd | 0.020 | 0.017 | 0.116 | 0.113 |
+| Bwd | 0.013 | 0.016 | 0.183 | 0.132 |
+
+### Cost of Python's production heuristic policy
+
+Adding `FALLBACK` has little effect before planning and is therefore best isolated in
+the planning stages:
+
+| Direction and stage | Python `A` avg / median | Python `A+FALLBACK` avg / median | Increment avg / median |
+|---|---:|---:|---:|
+| Fwd total | 27.006 / 26.997 | 27.392 / 27.288 | +0.386 / +0.291 |
+| Fwd create execution plans | 1.846 / 1.828 | 1.937 / 1.898 | +0.091 / +0.071 |
+| Fwd build plans | 24.377 / 24.394 | 24.642 / 24.546 | +0.265 / +0.152 |
+| Bwd total | 31.208 / 31.027 | 33.016 / 32.760 | +1.808 / +1.733 |
+| Bwd create execution plans | 3.017 / 3.004 | 4.643 / 4.614 | +1.626 / +1.610 |
+| Bwd build plans | 26.581 / 26.550 | 26.717 / 26.677 | +0.135 / +0.127 |
+
+For backward, 1.610 ms of the 1.733 ms median policy increment occurs directly in
+`create_execution_plans`. `FALLBACK` is therefore the main reason the production
+Python backward graph build remains visibly farther from C++ than the matched run.
+This is a coverage-versus-build-latency policy difference in TE, not Python binding
+overhead.
+
+### Why the matched Python path is still slower
+
+There are differences on both the TE side and in the public cuDNN frontend Python API:
+
+- TE's C++ path constructs `cudnn_frontend::graph::Graph`, tensor descriptors, and the
+  SDPA node directly, then calls the five native validation/planning methods.
+- TE's Python path first constructs the public `cudnn.pygraph` IR. In cuDNN frontend
+  1.27.0, `python/cudnn/_pygraph.py::validate()` performs Python property inference and
+  validation, calls `_lower_to_cpp()`, recreates tensors and the SDPA node in the
+  internal pybind `backend_graph`, and finally invokes native validation. This explains
+  the 0.200-0.300 ms median materialization difference.
+- The pybind methods themselves are thin wrappers around the same C++
+  `cudnn_frontend::graph::Graph` methods. The nearly equal operation-graph and support
+  stages are consistent with that shared native implementation.
+- Public Python `create_execution_plans()` additionally discovers candidate engines,
+  invokes its router, and constructs a unified Python plan list around the backend
+  results. Its `build_plans()` walks that list and may dispatch a backend entry through
+  `build_plan_at_index`; C++ TE calls `Graph::build_plans()` directly. That public-API
+  orchestration accounts for the remaining planning delta, especially the 0.338 ms
+  backward `build_plans` median difference.
+- Without `--match-cpp-graph-build`, TE also deliberately asks Python cuDNN frontend for
+  both `A` and `FALLBACK`, while C++ TE asks only for `A`. That separate policy choice
+  accounts for most of the additional production backward gap.
+
+The result is now an apples-to-apples comparison at two useful levels: the inclusive
+range measures the real TE C++ and public-Python codepaths, while the common planning
+ranges show that their lowered native cuDNN work is much closer. Making the inclusive
+ranges identical would require bypassing the public Python IR/router and benchmarking
+the private `backend_graph` binding, which would no longer represent TE's Python
+codepath.
+
+### Graph-build artifacts
+
+The reports and fresh SQLite exports are retained under:
+
+```text
+benchmarks/attention/artifacts/cudnn_graph_build_20260808/
+```
+
+| Configuration | Nsight report | SQLite export |
+|---|---|---|
+| C++ `A` | `cpp_a_fwd_bwd_30.nsys-rep` | `cpp_a_fwd_bwd_30.sqlite` |
+| Python `A` | `python_a_fwd_bwd_30.nsys-rep` | `python_a_fwd_bwd_30.sqlite` |
+| Python `A+FALLBACK` | `python_a_fallback_fwd_bwd_30.nsys-rep` | `python_a_fallback_fwd_bwd_30.sqlite` |
+
+The SQLite files and tables above were generated with:
+
+```bash
+nsys stats \
+    --force-export=true \
+    --report nvtx_sum \
+    --format csv \
+    benchmarks/attention/artifacts/cudnn_graph_build_20260808/<report>.nsys-rep
+```
+
+This round is still one ordered profile per configuration on one shape. Nsight adds
+instrumentation overhead, clocks were not locked, and occasional Python/OS scheduling
+outliers affect averages. The medians are the more stable comparison; broader claims
+would require counterbalanced repetitions across shapes, dtypes, masks, and GQA.
