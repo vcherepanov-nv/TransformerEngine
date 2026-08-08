@@ -9,7 +9,9 @@
 #include <cudnn_frontend.h>
 #include <cudnn_frontend_utils.h>
 
+#include <atomic>
 #include <map>
+#include <optional>
 #include <vector>
 
 #include "../common.h"
@@ -47,6 +49,22 @@
 
 namespace transformer_engine {
 namespace fused_attn {
+
+namespace {
+
+std::atomic<bool> graph_build_profiling_enabled{false};
+std::atomic<std::uint64_t> graph_cache_epoch{0};
+
+}  // namespace
+
+void set_graph_build_profiling_enabled(bool enabled) {
+  graph_build_profiling_enabled.store(enabled);
+}
+
+void reset_graph_caches() {
+  graph_cache_epoch.fetch_add(1);
+}
+
 void fused_attn_arbitrary_seqlen_fwd_impl(
     int64_t b, int64_t h, int64_t hg, int64_t s_q, int64_t s_kv, int64_t d_qk, int64_t d_v,
     int64_t max_b, int64_t max_t_q, int64_t max_t_kv, int64_t num_pages_k, int64_t num_pages_v,
@@ -207,6 +225,12 @@ void fused_attn_arbitrary_seqlen_fwd_impl(
 
     using CacheType = std::map<FADescriptor_v1, graph_and_tensors>;
     static thread_local CacheType sdpa_f16_fprop_cache;
+    const auto current_graph_cache_epoch = graph_cache_epoch.load();
+    static thread_local std::uint64_t local_graph_cache_epoch = current_graph_cache_epoch;
+    if (local_graph_cache_epoch != current_graph_cache_epoch) {
+      sdpa_f16_fprop_cache.clear();
+      local_graph_cache_epoch = current_graph_cache_epoch;
+    }
 
     // Get plan from cache if cache is available, otherwise create one
     auto get_graph = [&](CacheType &cache, const FADescriptor_v1 &descriptor) -> graph_and_tensors {
@@ -218,6 +242,13 @@ void fused_attn_arbitrary_seqlen_fwd_impl(
       }
 
       // otherwise, build the op_graph and the plan. Then update cache
+      const bool profile_graph_build = graph_build_profiling_enabled.load();
+      std::optional<transformer_engine::nvtx::NVTXWrapper> total_range;
+      std::optional<transformer_engine::nvtx::NVTXWrapper> definition_range;
+      if (profile_graph_build) {
+        total_range.emplace("cudnn_graph_build_cpp_fwd");
+        definition_range.emplace("cudnn_graph_definition_cpp_fwd");
+      }
       auto mha_graph = std::make_shared<fe::graph::Graph>();
       mha_graph->set_io_data_type(tensorType)
           .set_intermediate_data_type(fe::DataType_t::FLOAT)
@@ -479,11 +510,22 @@ void fused_attn_arbitrary_seqlen_fwd_impl(
       auto dropout_tuple = is_dropout ? std::make_tuple(dropout_seed, dropout_offset)
                                       : std::make_tuple(nullptr, nullptr);
 
+      if (profile_graph_build) {
+        definition_range.reset();
+      }
+      std::optional<transformer_engine::nvtx::NVTXWrapper> finalization_range;
+      if (profile_graph_build) {
+        finalization_range.emplace("cudnn_graph_finalization_cpp_fwd");
+      }
       NVTE_CHECK_CUDNN_FE(mha_graph->validate());
       NVTE_CHECK_CUDNN_FE(mha_graph->build_operation_graph(handle));
       NVTE_CHECK_CUDNN_FE(mha_graph->create_execution_plans({fe::HeurMode_t::A}));
       NVTE_CHECK_CUDNN_FE(mha_graph->check_support(handle));
       NVTE_CHECK_CUDNN_FE(mha_graph->build_plans(handle));
+      if (profile_graph_build) {
+        finalization_range.reset();
+        total_range.reset();
+      }
 
       auto return_tuple =
           std::tuple_cat(std::make_tuple(mha_graph), key_tensors_tuple, Stats_tuple, bias_tuple,
@@ -774,6 +816,12 @@ void fused_attn_arbitrary_seqlen_bwd_impl(
 
     using CacheType = std::map<FADescriptor_v1, graph_and_tensors>;
     static thread_local CacheType sdpa_f16_bprop_cache;
+    const auto current_graph_cache_epoch = graph_cache_epoch.load();
+    static thread_local std::uint64_t local_graph_cache_epoch = current_graph_cache_epoch;
+    if (local_graph_cache_epoch != current_graph_cache_epoch) {
+      sdpa_f16_bprop_cache.clear();
+      local_graph_cache_epoch = current_graph_cache_epoch;
+    }
 
     // Get plan from cache if cache is available, otherwise create one
     auto get_graph = [&](CacheType &cache, const FADescriptor_v1 &descriptor) -> graph_and_tensors {
@@ -785,6 +833,13 @@ void fused_attn_arbitrary_seqlen_bwd_impl(
       }
 
       // otherwise, build the op_graph and the plan. Then update cache
+      const bool profile_graph_build = graph_build_profiling_enabled.load();
+      std::optional<transformer_engine::nvtx::NVTXWrapper> total_range;
+      std::optional<transformer_engine::nvtx::NVTXWrapper> definition_range;
+      if (profile_graph_build) {
+        total_range.emplace("cudnn_graph_build_cpp_bwd");
+        definition_range.emplace("cudnn_graph_definition_cpp_bwd");
+      }
       auto mha_graph = std::make_shared<fe::graph::Graph>();
       mha_graph->set_io_data_type(tensorType)
           .set_intermediate_data_type(fe::DataType_t::FLOAT)
@@ -1018,11 +1073,22 @@ void fused_attn_arbitrary_seqlen_bwd_impl(
       auto dropout_tuple = is_dropout ? std::make_tuple(dropout_seed, dropout_offset)
                                       : std::make_tuple(nullptr, nullptr);
 
+      if (profile_graph_build) {
+        definition_range.reset();
+      }
+      std::optional<transformer_engine::nvtx::NVTXWrapper> finalization_range;
+      if (profile_graph_build) {
+        finalization_range.emplace("cudnn_graph_finalization_cpp_bwd");
+      }
       NVTE_CHECK_CUDNN_FE(mha_graph->validate());
       NVTE_CHECK_CUDNN_FE(mha_graph->build_operation_graph(handle));
       NVTE_CHECK_CUDNN_FE(mha_graph->create_execution_plans({fe::HeurMode_t::A}));
       NVTE_CHECK_CUDNN_FE(mha_graph->check_support(handle));
       NVTE_CHECK_CUDNN_FE(mha_graph->build_plans(handle));
+      if (profile_graph_build) {
+        finalization_range.reset();
+        total_range.reset();
+      }
 
       auto return_tuple = std::tuple_cat(std::make_tuple(mha_graph), key_tensors_tuple, bias_tuple,
                                          softmax_offset_tuple, padding_tuple, offset_qo_tuple,

@@ -33,6 +33,30 @@ GPU kernels:
 
    python benchmarks/attention/profile_fused_attention.py \
        --impl cpp --shape small --iterations 100
+
+Measure warmed-process, cold-cache cuDNN graph construction:
+
+.. code-block:: bash
+
+   nsys profile \
+       --capture-range=cudaProfilerApi \
+       --capture-range-end=stop \
+       --trace=cuda,nvtx \
+       --sample=none \
+       --output=cpp_graph_creation \
+       --force-overwrite=true \
+       python benchmarks/attention/profile_fused_attention.py \
+           --impl cpp --measure graph_creation --mode fwd_bwd \
+           --warmup 2 --iterations 10 --profile
+
+   nsys stats --report nvtx_sum cpp_graph_creation.nsys-rep
+
+Run the same command with ``--impl python`` and a different output name to profile
+the Python frontend. Graph-build durations are reported by the nested
+``cudnn_graph_{build,definition,finalization}_{cpp,python}_{fwd,bwd}`` NVTX ranges.
+The ``build`` range is inclusive; ``definition`` and ``finalization`` are its
+components. Forward-only mode builds an inference graph, while forward-plus-backward
+mode builds a training forward graph with softmax statistics.
 """
 
 import argparse
@@ -63,6 +87,15 @@ SHAPE_PRESETS = {
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--impl", choices=("cpp", "python"), required=True)
+    parser.add_argument(
+        "--measure",
+        choices=("runtime", "graph_creation"),
+        default="runtime",
+        help=(
+            "Measure steady-state runtime or warmed-process, cold-cache cuDNN "
+            "graph construction."
+        ),
+    )
     parser.add_argument(
         "--shape",
         choices=tuple(SHAPE_PRESETS),
@@ -136,6 +169,74 @@ def _run_step(
         )
 
 
+def _set_graph_build_profiling(impl: str, enabled: bool, tex, cudnn_attention) -> None:
+    """Toggle graph-build instrumentation for one fused-attention implementation."""
+    if impl == "cpp":
+        tex._set_fused_attn_graph_build_profiling(enabled)
+    else:
+        cudnn_attention._set_cudnn_attention_graph_build_profiling(enabled)
+
+
+def _reset_graph_cache(impl: str, tex, cudnn_attention) -> None:
+    """Invalidate the selected implementation's graph cache."""
+    if impl == "cpp":
+        tex._reset_fused_attn_graph_caches()
+    else:
+        cudnn_attention._reset_cudnn_attention_graph_cache()
+
+
+def _benchmark_graph_creation(
+    args,
+    shape,
+    attention,
+    query,
+    key,
+    value,
+    d_out,
+    run_backward: bool,
+    device: torch.device,
+    tex,
+    cudnn_attention,
+) -> None:
+    """Emit NVTX ranges for warmed-process, cold-cache graph builds."""
+    if args.cpu_overhead:
+        raise ValueError("--cpu-overhead applies only to --measure runtime.")
+
+    range_prefix = (
+        f"fused_attention_{args.impl}_graph_creation_{args.mode}_"
+        f"b{args.batch_size}_s{args.sequence_length}_"
+        f"h{args.num_heads}_d{args.head_dim}_{args.dtype}_{args.mask}"
+    )
+
+    _set_graph_build_profiling(args.impl, True, tex, cudnn_attention)
+    if args.profile:
+        torch.cuda.cudart().cudaProfilerStart()
+    try:
+        for trial in range(args.iterations):
+            _reset_graph_cache(args.impl, tex, cudnn_attention)
+            with torch.cuda.nvtx.range(f"{range_prefix}_trial_{trial}"):
+                _run_step(
+                    attention,
+                    query,
+                    key,
+                    value,
+                    d_out,
+                    args.mask,
+                    run_backward,
+                )
+            torch.cuda.synchronize(device)
+    finally:
+        if args.profile:
+            torch.cuda.cudart().cudaProfilerStop()
+        _set_graph_build_profiling(args.impl, False, tex, cudnn_attention)
+
+    print(
+        f"impl={args.impl} measure=graph_creation mode={args.mode} "
+        f"dtype={args.dtype} mask={args.mask} shape={shape} "
+        f"trials={args.iterations} timing_source=nsys_nvtx"
+    )
+
+
 def main() -> None:
     args = _parse_args()
     if args.warmup < 1:
@@ -154,6 +255,10 @@ def main() -> None:
     from transformer_engine.pytorch.attention.dot_product_attention import (
         _attention_backends,
     )
+    from transformer_engine.pytorch.attention.dot_product_attention import (
+        cudnn_attention,
+    )
+    import transformer_engine_torch as tex
 
     torch.cuda.set_device(args.device)
     device = torch.device("cuda", args.device)
@@ -210,6 +315,22 @@ def main() -> None:
         raise RuntimeError(
             "FusedAttention was not selected despite the forced backend settings."
         )
+
+    if args.measure == "graph_creation":
+        _benchmark_graph_creation(
+            args,
+            shape,
+            attention,
+            query,
+            key,
+            value,
+            d_out,
+            run_backward,
+            device,
+            tex,
+            cudnn_attention,
+        )
+        return
 
     torch.cuda.reset_peak_memory_stats(device)
     start = torch.cuda.Event(enable_timing=True)

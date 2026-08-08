@@ -17,6 +17,13 @@
 #include "transformer_engine/fused_attn.h"
 
 namespace transformer_engine {
+namespace fused_attn {
+
+void set_graph_build_profiling_enabled(bool enabled);
+void reset_graph_caches();
+
+}  // namespace fused_attn
+
 void fused_attn_arbitrary_seqlen_fwd(
     size_t batch, size_t num_attn_heads, size_t num_gqa_groups, size_t max_seqlen_q,
     size_t max_seqlen_kv, size_t head_dim_qk, size_t head_dim_v, size_t num_tokens_q,

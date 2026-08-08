@@ -4,6 +4,7 @@
 
 """Ordinary fused attention implemented with the cuDNN frontend Python API."""
 
+from contextlib import nullcontext
 from dataclasses import dataclass
 from typing import Any
 
@@ -19,6 +20,25 @@ from transformer_engine.pytorch.attention.dot_product_attention.cudnn_frontend i
 )
 
 _cudnn_attention_graph_cache: dict[tuple[Any, ...], Any] = {}
+_cudnn_attention_graph_build_profiling_enabled = False
+
+
+def _set_cudnn_attention_graph_build_profiling(enabled: bool) -> None:
+    """Enable or disable ordinary-attention graph-build profiling."""
+    global _cudnn_attention_graph_build_profiling_enabled
+    _cudnn_attention_graph_build_profiling_enabled = enabled
+
+
+def _reset_cudnn_attention_graph_cache() -> None:
+    """Invalidate ordinary-attention graphs."""
+    _cudnn_attention_graph_cache.clear()
+
+
+def _graph_build_nvtx_range(name: str):
+    """Create an NVTX range only while graph-build profiling is enabled."""
+    if _cudnn_attention_graph_build_profiling_enabled:
+        return torch.cuda.nvtx.range(name)
+    return nullcontext()
 
 
 def _device_key(device: torch.device) -> tuple[Any, ...]:
@@ -164,33 +184,37 @@ def _build_cudnn_attention_fwd_graph(
     stats: torch.Tensor | None,
 ) -> _CudnnAttentionFwdGraphEntry:
     """Build a cuDNN frontend Python graph for ordinary SDPA fprop."""
-    cudnn = _import_cudnn_frontend()
-    graph = _build_cudnn_pygraph(query_layer.dtype, query_layer.device)
-    q = _bhsd_graph_tensor(graph, query_layer, q_format)
-    k = _bhsd_graph_tensor(graph, key_layer, kv_format)
-    v = _bhsd_graph_tensor(graph, value_layer, kv_format)
+    with _graph_build_nvtx_range("cudnn_graph_build_python_fwd"):
+        with _graph_build_nvtx_range("cudnn_graph_definition_python_fwd"):
+            cudnn = _import_cudnn_frontend()
+            graph = _build_cudnn_pygraph(query_layer.dtype, query_layer.device)
+            q = _bhsd_graph_tensor(graph, query_layer, q_format)
+            k = _bhsd_graph_tensor(graph, key_layer, kv_format)
+            v = _bhsd_graph_tensor(graph, value_layer, kv_format)
 
-    output_dim, output_stride = _bhsd_dim_stride(output_layer, q_format)
-    output, stats_tensor = graph.sdpa(
-        name="te_python_frontend_sdpa",
-        q=q,
-        k=k,
-        v=v,
-        generate_stats=is_training,
-        attn_scale=attn_scale,
-        **_sdpa_mask_kwargs(attn_mask_type),
-    )
-    output.set_output(True).set_dim(output_dim).set_stride(output_stride)
+            output_dim, output_stride = _bhsd_dim_stride(output_layer, q_format)
+            output, stats_tensor = graph.sdpa(
+                name="te_python_frontend_sdpa",
+                q=q,
+                k=k,
+                v=v,
+                generate_stats=is_training,
+                attn_scale=attn_scale,
+                **_sdpa_mask_kwargs(attn_mask_type),
+            )
+            output.set_output(True).set_dim(output_dim).set_stride(output_stride)
 
-    if is_training:
-        assert stats is not None
-        stats_tensor.set_output(True).set_dim(stats.size()).set_stride(
-            stats.stride()
-        ).set_data_type(cudnn.data_type.FLOAT)
-    else:
-        stats_tensor = None
+            if is_training:
+                assert stats is not None
+                stats_tensor.set_output(True).set_dim(stats.size()).set_stride(
+                    stats.stride()
+                ).set_data_type(cudnn.data_type.FLOAT)
+            else:
+                stats_tensor = None
 
-    workspace_size = _finalize_cudnn_graph(graph)
+        with _graph_build_nvtx_range("cudnn_graph_finalization_python_fwd"):
+            workspace_size = _finalize_cudnn_graph(graph)
+
     return _CudnnAttentionFwdGraphEntry(
         graph=graph,
         q=q,
@@ -249,37 +273,41 @@ def _build_cudnn_attention_bwd_graph(
     deterministic: bool,
 ) -> _CudnnAttentionBwdGraphEntry:
     """Build a cuDNN frontend Python graph for ordinary SDPA bprop."""
-    graph = _build_cudnn_pygraph(query_layer.dtype, query_layer.device)
-    q = _bhsd_graph_tensor(graph, query_layer, q_format)
-    k = _bhsd_graph_tensor(graph, key_layer, kv_format)
-    v = _bhsd_graph_tensor(graph, value_layer, kv_format)
-    output = _bhsd_graph_tensor(graph, output_layer, q_format)
-    d_output = _bhsd_graph_tensor(graph, d_out, q_format)
-    stats_tensor = graph.tensor_like(stats)
+    with _graph_build_nvtx_range("cudnn_graph_build_python_bwd"):
+        with _graph_build_nvtx_range("cudnn_graph_definition_python_bwd"):
+            graph = _build_cudnn_pygraph(query_layer.dtype, query_layer.device)
+            q = _bhsd_graph_tensor(graph, query_layer, q_format)
+            k = _bhsd_graph_tensor(graph, key_layer, kv_format)
+            v = _bhsd_graph_tensor(graph, value_layer, kv_format)
+            output = _bhsd_graph_tensor(graph, output_layer, q_format)
+            d_output = _bhsd_graph_tensor(graph, d_out, q_format)
+            stats_tensor = graph.tensor_like(stats)
 
-    dq_layer = torch.empty_like(query_layer)
-    dk_layer = torch.empty_like(key_layer)
-    dv_layer = torch.empty_like(value_layer)
-    dq_dim, dq_stride = _bhsd_dim_stride(dq_layer, q_format)
-    dk_dim, dk_stride = _bhsd_dim_stride(dk_layer, kv_format)
-    dv_dim, dv_stride = _bhsd_dim_stride(dv_layer, kv_format)
-    dq, dk, dv = graph.sdpa_backward(
-        name="te_python_frontend_sdpa_backward",
-        q=q,
-        k=k,
-        v=v,
-        o=output,
-        dO=d_output,
-        stats=stats_tensor,
-        attn_scale=attn_scale,
-        use_deterministic_algorithm=deterministic,
-        **_sdpa_mask_kwargs(attn_mask_type),
-    )
-    dq.set_output(True).set_dim(dq_dim).set_stride(dq_stride)
-    dk.set_output(True).set_dim(dk_dim).set_stride(dk_stride)
-    dv.set_output(True).set_dim(dv_dim).set_stride(dv_stride)
+            dq_layer = torch.empty_like(query_layer)
+            dk_layer = torch.empty_like(key_layer)
+            dv_layer = torch.empty_like(value_layer)
+            dq_dim, dq_stride = _bhsd_dim_stride(dq_layer, q_format)
+            dk_dim, dk_stride = _bhsd_dim_stride(dk_layer, kv_format)
+            dv_dim, dv_stride = _bhsd_dim_stride(dv_layer, kv_format)
+            dq, dk, dv = graph.sdpa_backward(
+                name="te_python_frontend_sdpa_backward",
+                q=q,
+                k=k,
+                v=v,
+                o=output,
+                dO=d_output,
+                stats=stats_tensor,
+                attn_scale=attn_scale,
+                use_deterministic_algorithm=deterministic,
+                **_sdpa_mask_kwargs(attn_mask_type),
+            )
+            dq.set_output(True).set_dim(dq_dim).set_stride(dq_stride)
+            dk.set_output(True).set_dim(dk_dim).set_stride(dk_stride)
+            dv.set_output(True).set_dim(dv_dim).set_stride(dv_stride)
 
-    workspace_size = _finalize_cudnn_graph(graph)
+        with _graph_build_nvtx_range("cudnn_graph_finalization_python_bwd"):
+            workspace_size = _finalize_cudnn_graph(graph)
+
     return _CudnnAttentionBwdGraphEntry(
         graph=graph,
         q=q,

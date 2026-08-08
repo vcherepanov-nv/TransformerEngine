@@ -5,6 +5,7 @@
  ************************************************************************/
 
 #include "../extensions.h"
+#include "common/fused_attn/fused_attn_f16_arbitrary_seqlen.h"
 #include "common.h"
 #include "pybind.h"
 
@@ -52,6 +53,14 @@ NVTE_Fused_Attn_Backend get_fused_attn_backend(
       max_seqlen_q, max_seqlen_kv, head_dim_qk, head_dim_v, window_size_left, window_size_right,
       return_max_logit, cuda_graph, deterministic);
   return fused_attention_backend;
+}
+
+void set_fused_attn_graph_build_profiling(bool enabled) {
+  transformer_engine::fused_attn::set_graph_build_profiling_enabled(enabled);
+}
+
+void reset_fused_attn_graph_caches() {
+  transformer_engine::fused_attn::reset_graph_caches();
 }
 
 // helper function for S and dP quantizers

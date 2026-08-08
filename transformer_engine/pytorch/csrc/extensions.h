@@ -93,6 +93,9 @@ NVTE_Fused_Attn_Backend get_fused_attn_backend(
     size_t max_seqlen_kv, size_t head_dim_qk, size_t head_dim_v, int64_t window_size_left,
     int64_t window_size_right, bool return_max_logit, bool cuda_graph, bool deterministic);
 
+void set_fused_attn_graph_build_profiling(bool enabled);
+void reset_fused_attn_graph_caches();
+
 std::vector<py::object> fused_attn_fwd(
     size_t max_seqlen_q, size_t max_seqlen_kv, bool is_training, float attn_scale, float p_dropout,
     bool set_zero, NVTE_QKV_Layout qkv_layout, NVTE_QKV_Format o_format,

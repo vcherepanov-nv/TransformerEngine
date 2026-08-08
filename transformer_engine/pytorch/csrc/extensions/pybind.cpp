@@ -506,6 +506,12 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
         "Fused Attention FP8/BF16/FP16 FWD with separate Q, K and V");
   m.def("fused_attn_bwd", &transformer_engine::pytorch::fused_attn_bwd,
         "Fused Attention FP8/BF16/FP16 BWD with separate Q, K and V");
+  m.def("_set_fused_attn_graph_build_profiling",
+        &transformer_engine::pytorch::set_fused_attn_graph_build_profiling,
+        "Enable or disable fused-attention graph-build profiling");
+  m.def("_reset_fused_attn_graph_caches",
+        &transformer_engine::pytorch::reset_fused_attn_graph_caches,
+        "Invalidate cached fused-attention graphs on their next thread-local access");
   m.def("copy_to_kv_cache", &transformer_engine::pytorch::copy_to_kv_cache,
         "Copy new KV tokens to KV cache", py::call_guard<py::gil_scoped_release>());
   m.def("convert_thd_to_bshd", &transformer_engine::pytorch::convert_thd_to_bshd,

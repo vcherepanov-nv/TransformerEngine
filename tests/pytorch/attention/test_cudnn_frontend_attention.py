@@ -14,6 +14,7 @@ from transformer_engine.pytorch.attention.dot_product_attention.backends import 
 )
 from transformer_engine.pytorch.cpp_extensions.fused_attn import FusedAttnBackend
 from transformer_engine.pytorch.utils import get_cudnn_version
+import transformer_engine_torch as tex
 
 
 def _cpu_inputs():
@@ -54,6 +55,115 @@ def test_cudnn_attention_cache_keys_include_mask_and_determinism():
         q, k, v, o, o, stats, "bshd", "bshd", 0.5, "no_mask", True
     )
     assert bwd_nondeterministic != bwd_deterministic
+
+
+def test_python_frontend_graph_build_nvtx_ranges(monkeypatch):
+    """Graph builders should emit nested, direction-specific NVTX ranges."""
+
+    class FakeTensor:
+        def set_output(self, *_args):
+            return self
+
+        def set_dim(self, *_args):
+            return self
+
+        def set_stride(self, *_args):
+            return self
+
+        def set_data_type(self, *_args):
+            return self
+
+    class FakeGraph:
+        def tensor(self, **_kwargs):
+            return FakeTensor()
+
+        def tensor_like(self, _tensor):
+            return FakeTensor()
+
+        def sdpa(self, **_kwargs):
+            return FakeTensor(), FakeTensor()
+
+        def sdpa_backward(self, **_kwargs):
+            return FakeTensor(), FakeTensor(), FakeTensor()
+
+    class FakeCudnn:
+        class data_type:
+            FLOAT = object()
+
+    events = []
+
+    class FakeRange:
+        def __init__(self, name):
+            self.name = name
+
+        def __enter__(self):
+            events.append(("enter", self.name))
+
+        def __exit__(self, *_args):
+            events.append(("exit", self.name))
+
+    monkeypatch.setattr(torch.cuda.nvtx, "range", FakeRange)
+    monkeypatch.setattr(cudnn_attention, "_import_cudnn_frontend", FakeCudnn)
+    monkeypatch.setattr(
+        cudnn_attention, "_build_cudnn_pygraph", lambda *_args: FakeGraph()
+    )
+    monkeypatch.setattr(cudnn_attention, "_finalize_cudnn_graph", lambda _graph: 1)
+
+    q, k, v, o, stats = _cpu_inputs()
+    cudnn_attention._set_cudnn_attention_graph_build_profiling(True)
+    try:
+        cudnn_attention._build_cudnn_attention_fwd_graph(
+            True, q, k, v, "bshd", "bshd", 0.5, "no_mask", o, stats
+        )
+        cudnn_attention._build_cudnn_attention_bwd_graph(
+            q, k, v, o, o, stats, "bshd", "bshd", 0.5, "no_mask", False
+        )
+    finally:
+        cudnn_attention._set_cudnn_attention_graph_build_profiling(False)
+
+    assert events == [
+        ("enter", "cudnn_graph_build_python_fwd"),
+        ("enter", "cudnn_graph_definition_python_fwd"),
+        ("exit", "cudnn_graph_definition_python_fwd"),
+        ("enter", "cudnn_graph_finalization_python_fwd"),
+        ("exit", "cudnn_graph_finalization_python_fwd"),
+        ("exit", "cudnn_graph_build_python_fwd"),
+        ("enter", "cudnn_graph_build_python_bwd"),
+        ("enter", "cudnn_graph_definition_python_bwd"),
+        ("exit", "cudnn_graph_definition_python_bwd"),
+        ("enter", "cudnn_graph_finalization_python_bwd"),
+        ("exit", "cudnn_graph_finalization_python_bwd"),
+        ("exit", "cudnn_graph_build_python_bwd"),
+    ]
+
+    events.clear()
+    cudnn_attention._build_cudnn_attention_fwd_graph(
+        True, q, k, v, "bshd", "bshd", 0.5, "no_mask", o, stats
+    )
+    assert not events
+
+
+def test_python_frontend_graph_cache_reset():
+    """The cache-reset hook should invalidate cached Python graphs."""
+    cache = cudnn_attention._cudnn_attention_graph_cache
+    saved_cache = dict(cache)
+    try:
+        cache.clear()
+        cache["sentinel"] = object()
+        cudnn_attention._reset_cudnn_attention_graph_cache()
+        assert not cache
+    finally:
+        cache.clear()
+        cache.update(saved_cache)
+
+
+def test_cpp_frontend_graph_profile_bindings():
+    """The private profiling bindings should be callable without CUDA work."""
+    tex._set_fused_attn_graph_build_profiling(True)
+    try:
+        tex._reset_fused_attn_graph_caches()
+    finally:
+        tex._set_fused_attn_graph_build_profiling(False)
 
 
 def test_python_frontend_autograd_plumbing(monkeypatch):
