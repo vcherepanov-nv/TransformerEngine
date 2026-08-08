@@ -51,12 +51,16 @@ Measure warmed-process, cold-cache cuDNN graph construction:
 
    nsys stats --report nvtx_sum cpp_graph_creation.nsys-rep
 
-Run the same command with ``--impl python`` and a different output name to profile
-the Python frontend. Graph-build durations are reported by the nested
-``cudnn_graph_{build,definition,finalization}_{cpp,python}_{fwd,bwd}`` NVTX ranges.
-The ``build`` range is inclusive; ``definition`` and ``finalization`` are its
-components. Forward-only mode builds an inference graph, while forward-plus-backward
-mode builds a training forward graph with softmax statistics.
+Run the same command with ``--impl python --match-cpp-graph-build`` and a different
+output name to compare the Python frontend with the C++ path using the same cuDNN
+heuristic mode. Graph-build durations are reported by the inclusive
+``cudnn_graph_build_{cpp,python}_{fwd,bwd}`` ranges. Both implementations also emit
+``materialization_and_validation``, ``build_operation_graph``,
+``create_execution_plans``, ``check_support``, and ``build_plans`` stages. Python
+adds ``ir_definition`` and ``lowering_and_native_validation`` detail;
+C++ adds ``native_definition`` and ``native_validation`` detail. Forward-only mode
+builds an inference graph, while forward-plus-backward mode builds a training
+forward graph with softmax statistics.
 """
 
 import argparse
@@ -66,7 +70,6 @@ import time
 from typing import Literal
 
 import torch
-
 
 SHAPE_PRESETS = {
     "large": {
@@ -124,6 +127,14 @@ def _parse_args() -> argparse.Namespace:
         "--profile",
         action="store_true",
         help="Bracket measured iterations with cudaProfilerStart/Stop for nsys capture-range.",
+    )
+    parser.add_argument(
+        "--match-cpp-graph-build",
+        action="store_true",
+        help=(
+            "For Python graph-creation profiling, use the C++ path's heur_mode.A-only "
+            "policy instead of the production Python A-plus-FALLBACK policy."
+        ),
     )
     args = parser.parse_args()
     for name, value in SHAPE_PRESETS[args.shape].items():
@@ -208,6 +219,9 @@ def _benchmark_graph_creation(
         f"h{args.num_heads}_d{args.head_dim}_{args.dtype}_{args.mask}"
     )
 
+    match_cpp_graph_build = args.impl == "python" and args.match_cpp_graph_build
+    if match_cpp_graph_build:
+        cudnn_attention._set_cudnn_attention_cpp_comparable_graph_build(True)
     _set_graph_build_profiling(args.impl, True, tex, cudnn_attention)
     if args.profile:
         torch.cuda.cudart().cudaProfilerStart()
@@ -229,11 +243,14 @@ def _benchmark_graph_creation(
         if args.profile:
             torch.cuda.cudart().cudaProfilerStop()
         _set_graph_build_profiling(args.impl, False, tex, cudnn_attention)
+        if match_cpp_graph_build:
+            cudnn_attention._set_cudnn_attention_cpp_comparable_graph_build(False)
 
     print(
         f"impl={args.impl} measure=graph_creation mode={args.mode} "
         f"dtype={args.dtype} mask={args.mask} shape={shape} "
-        f"trials={args.iterations} timing_source=nsys_nvtx"
+        f"trials={args.iterations} timing_source=nsys_nvtx "
+        f"heuristic_policy={'A' if args.impl == 'cpp' or match_cpp_graph_build else 'A+FALLBACK'}"
     )
 
 
@@ -245,6 +262,12 @@ def main() -> None:
         )
     if args.iterations < 1:
         raise ValueError("--iterations must be at least 1.")
+    if args.match_cpp_graph_build and not (
+        args.impl == "python" and args.measure == "graph_creation"
+    ):
+        raise ValueError(
+            "--match-cpp-graph-build requires --impl python --measure graph_creation."
+        )
 
     # The implementation selector only applies after FusedAttention is chosen.
     os.environ["NVTE_FLASH_ATTN"] = "0"
@@ -259,6 +282,10 @@ def main() -> None:
         cudnn_attention,
     )
     import transformer_engine_torch as tex
+
+    if args.match_cpp_graph_build:
+        # Warm the same heuristic path that will be measured after each cache reset.
+        cudnn_attention._set_cudnn_attention_cpp_comparable_graph_build(True)
 
     torch.cuda.set_device(args.device)
     device = torch.device("cuda", args.device)

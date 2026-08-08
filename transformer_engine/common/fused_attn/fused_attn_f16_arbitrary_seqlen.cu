@@ -244,10 +244,13 @@ void fused_attn_arbitrary_seqlen_fwd_impl(
       // otherwise, build the op_graph and the plan. Then update cache
       const bool profile_graph_build = graph_build_profiling_enabled.load();
       std::optional<transformer_engine::nvtx::NVTXWrapper> total_range;
+      std::optional<transformer_engine::nvtx::NVTXWrapper> materialization_range;
       std::optional<transformer_engine::nvtx::NVTXWrapper> definition_range;
       if (profile_graph_build) {
         total_range.emplace("cudnn_graph_build_cpp_fwd");
-        definition_range.emplace("cudnn_graph_definition_cpp_fwd");
+        materialization_range.emplace(
+            "cudnn_graph_materialization_and_validation_cpp_fwd");
+        definition_range.emplace("cudnn_graph_native_definition_cpp_fwd");
       }
       auto mha_graph = std::make_shared<fe::graph::Graph>();
       mha_graph->set_io_data_type(tensorType)
@@ -513,17 +516,34 @@ void fused_attn_arbitrary_seqlen_fwd_impl(
       if (profile_graph_build) {
         definition_range.reset();
       }
-      std::optional<transformer_engine::nvtx::NVTXWrapper> finalization_range;
+      std::optional<transformer_engine::nvtx::NVTXWrapper> stage_range;
       if (profile_graph_build) {
-        finalization_range.emplace("cudnn_graph_finalization_cpp_fwd");
+        stage_range.emplace("cudnn_graph_native_validation_cpp_fwd");
       }
       NVTE_CHECK_CUDNN_FE(mha_graph->validate());
+      if (profile_graph_build) {
+        stage_range.reset();
+        materialization_range.reset();
+        stage_range.emplace("cudnn_graph_build_operation_graph_cpp_fwd");
+      }
       NVTE_CHECK_CUDNN_FE(mha_graph->build_operation_graph(handle));
+      if (profile_graph_build) {
+        stage_range.reset();
+        stage_range.emplace("cudnn_graph_create_execution_plans_cpp_fwd");
+      }
       NVTE_CHECK_CUDNN_FE(mha_graph->create_execution_plans({fe::HeurMode_t::A}));
+      if (profile_graph_build) {
+        stage_range.reset();
+        stage_range.emplace("cudnn_graph_check_support_cpp_fwd");
+      }
       NVTE_CHECK_CUDNN_FE(mha_graph->check_support(handle));
+      if (profile_graph_build) {
+        stage_range.reset();
+        stage_range.emplace("cudnn_graph_build_plans_cpp_fwd");
+      }
       NVTE_CHECK_CUDNN_FE(mha_graph->build_plans(handle));
       if (profile_graph_build) {
-        finalization_range.reset();
+        stage_range.reset();
         total_range.reset();
       }
 
@@ -835,10 +855,13 @@ void fused_attn_arbitrary_seqlen_bwd_impl(
       // otherwise, build the op_graph and the plan. Then update cache
       const bool profile_graph_build = graph_build_profiling_enabled.load();
       std::optional<transformer_engine::nvtx::NVTXWrapper> total_range;
+      std::optional<transformer_engine::nvtx::NVTXWrapper> materialization_range;
       std::optional<transformer_engine::nvtx::NVTXWrapper> definition_range;
       if (profile_graph_build) {
         total_range.emplace("cudnn_graph_build_cpp_bwd");
-        definition_range.emplace("cudnn_graph_definition_cpp_bwd");
+        materialization_range.emplace(
+            "cudnn_graph_materialization_and_validation_cpp_bwd");
+        definition_range.emplace("cudnn_graph_native_definition_cpp_bwd");
       }
       auto mha_graph = std::make_shared<fe::graph::Graph>();
       mha_graph->set_io_data_type(tensorType)
@@ -1076,17 +1099,34 @@ void fused_attn_arbitrary_seqlen_bwd_impl(
       if (profile_graph_build) {
         definition_range.reset();
       }
-      std::optional<transformer_engine::nvtx::NVTXWrapper> finalization_range;
+      std::optional<transformer_engine::nvtx::NVTXWrapper> stage_range;
       if (profile_graph_build) {
-        finalization_range.emplace("cudnn_graph_finalization_cpp_bwd");
+        stage_range.emplace("cudnn_graph_native_validation_cpp_bwd");
       }
       NVTE_CHECK_CUDNN_FE(mha_graph->validate());
+      if (profile_graph_build) {
+        stage_range.reset();
+        materialization_range.reset();
+        stage_range.emplace("cudnn_graph_build_operation_graph_cpp_bwd");
+      }
       NVTE_CHECK_CUDNN_FE(mha_graph->build_operation_graph(handle));
+      if (profile_graph_build) {
+        stage_range.reset();
+        stage_range.emplace("cudnn_graph_create_execution_plans_cpp_bwd");
+      }
       NVTE_CHECK_CUDNN_FE(mha_graph->create_execution_plans({fe::HeurMode_t::A}));
+      if (profile_graph_build) {
+        stage_range.reset();
+        stage_range.emplace("cudnn_graph_check_support_cpp_bwd");
+      }
       NVTE_CHECK_CUDNN_FE(mha_graph->check_support(handle));
+      if (profile_graph_build) {
+        stage_range.reset();
+        stage_range.emplace("cudnn_graph_build_plans_cpp_bwd");
+      }
       NVTE_CHECK_CUDNN_FE(mha_graph->build_plans(handle));
       if (profile_graph_build) {
-        finalization_range.reset();
+        stage_range.reset();
         total_range.reset();
       }
 

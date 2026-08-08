@@ -74,21 +74,36 @@ def test_python_frontend_graph_build_nvtx_ranges(monkeypatch):
             return self
 
     class FakeGraph:
+        def __init__(self):
+            self.sdpa_kwargs = None
+            self.sdpa_backward_kwargs = None
+
         def tensor(self, **_kwargs):
             return FakeTensor()
 
         def tensor_like(self, _tensor):
             return FakeTensor()
 
-        def sdpa(self, **_kwargs):
+        def sdpa(self, **kwargs):
+            self.sdpa_kwargs = kwargs
             return FakeTensor(), FakeTensor()
 
-        def sdpa_backward(self, **_kwargs):
+        def sdpa_backward(self, **kwargs):
+            self.sdpa_backward_kwargs = kwargs
             return FakeTensor(), FakeTensor(), FakeTensor()
+
+        def validate(self):
+            return None
+
+        def get_workspace_size(self):
+            return 1
 
     class FakeCudnn:
         class data_type:
             FLOAT = object()
+
+        class heur_mode:
+            A = object()
 
     events = []
 
@@ -104,36 +119,89 @@ def test_python_frontend_graph_build_nvtx_ranges(monkeypatch):
 
     monkeypatch.setattr(torch.cuda.nvtx, "range", FakeRange)
     monkeypatch.setattr(cudnn_attention, "_import_cudnn_frontend", FakeCudnn)
-    monkeypatch.setattr(
-        cudnn_attention, "_build_cudnn_pygraph", lambda *_args: FakeGraph()
-    )
-    monkeypatch.setattr(cudnn_attention, "_finalize_cudnn_graph", lambda _graph: 1)
+
+    graphs = []
+
+    def fake_build_graph(*_args):
+        graph = FakeGraph()
+        graphs.append(graph)
+        return graph
+
+    monkeypatch.setattr(cudnn_attention, "_build_cudnn_pygraph", fake_build_graph)
+
+    heuristic_calls = []
+
+    def fake_build_plans(_graph, heuristic_modes, *, stage_range):
+        heuristic_calls.append(heuristic_modes)
+        for stage in (
+            "build_operation_graph",
+            "create_execution_plans",
+            "check_support",
+            "build_plans",
+        ):
+            with stage_range(stage):
+                pass
+
+    monkeypatch.setattr(cudnn_attention, "_build_cudnn_graph_plans", fake_build_plans)
 
     q, k, v, o, stats = _cpu_inputs()
     cudnn_attention._set_cudnn_attention_graph_build_profiling(True)
+    cudnn_attention._set_cudnn_attention_cpp_comparable_graph_build(True)
     try:
-        cudnn_attention._build_cudnn_attention_fwd_graph(
+        fwd_entry = cudnn_attention._build_cudnn_attention_fwd_graph(
             True, q, k, v, "bshd", "bshd", 0.5, "no_mask", o, stats
         )
-        cudnn_attention._build_cudnn_attention_bwd_graph(
+        bwd_entry = cudnn_attention._build_cudnn_attention_bwd_graph(
             q, k, v, o, o, stats, "bshd", "bshd", 0.5, "no_mask", False
         )
     finally:
+        cudnn_attention._set_cudnn_attention_cpp_comparable_graph_build(False)
         cudnn_attention._set_cudnn_attention_graph_build_profiling(False)
 
     assert events == [
         ("enter", "cudnn_graph_build_python_fwd"),
-        ("enter", "cudnn_graph_definition_python_fwd"),
-        ("exit", "cudnn_graph_definition_python_fwd"),
-        ("enter", "cudnn_graph_finalization_python_fwd"),
-        ("exit", "cudnn_graph_finalization_python_fwd"),
+        ("enter", "cudnn_graph_materialization_and_validation_python_fwd"),
+        ("enter", "cudnn_graph_ir_definition_python_fwd"),
+        ("exit", "cudnn_graph_ir_definition_python_fwd"),
+        ("enter", "cudnn_graph_lowering_and_native_validation_python_fwd"),
+        ("exit", "cudnn_graph_lowering_and_native_validation_python_fwd"),
+        ("exit", "cudnn_graph_materialization_and_validation_python_fwd"),
+        ("enter", "cudnn_graph_build_operation_graph_python_fwd"),
+        ("exit", "cudnn_graph_build_operation_graph_python_fwd"),
+        ("enter", "cudnn_graph_create_execution_plans_python_fwd"),
+        ("exit", "cudnn_graph_create_execution_plans_python_fwd"),
+        ("enter", "cudnn_graph_check_support_python_fwd"),
+        ("exit", "cudnn_graph_check_support_python_fwd"),
+        ("enter", "cudnn_graph_build_plans_python_fwd"),
+        ("exit", "cudnn_graph_build_plans_python_fwd"),
         ("exit", "cudnn_graph_build_python_fwd"),
         ("enter", "cudnn_graph_build_python_bwd"),
-        ("enter", "cudnn_graph_definition_python_bwd"),
-        ("exit", "cudnn_graph_definition_python_bwd"),
-        ("enter", "cudnn_graph_finalization_python_bwd"),
-        ("exit", "cudnn_graph_finalization_python_bwd"),
+        ("enter", "cudnn_graph_materialization_and_validation_python_bwd"),
+        ("enter", "cudnn_graph_ir_definition_python_bwd"),
+        ("exit", "cudnn_graph_ir_definition_python_bwd"),
+        ("enter", "cudnn_graph_lowering_and_native_validation_python_bwd"),
+        ("exit", "cudnn_graph_lowering_and_native_validation_python_bwd"),
+        ("exit", "cudnn_graph_materialization_and_validation_python_bwd"),
+        ("enter", "cudnn_graph_build_operation_graph_python_bwd"),
+        ("exit", "cudnn_graph_build_operation_graph_python_bwd"),
+        ("enter", "cudnn_graph_create_execution_plans_python_bwd"),
+        ("exit", "cudnn_graph_create_execution_plans_python_bwd"),
+        ("enter", "cudnn_graph_check_support_python_bwd"),
+        ("exit", "cudnn_graph_check_support_python_bwd"),
+        ("enter", "cudnn_graph_build_plans_python_bwd"),
+        ("exit", "cudnn_graph_build_plans_python_bwd"),
         ("exit", "cudnn_graph_build_python_bwd"),
+    ]
+    assert graphs[0].sdpa_kwargs["attn_scale"] is fwd_entry.attn_scale
+    assert graphs[1].sdpa_backward_kwargs["attn_scale"] is bwd_entry.attn_scale
+    for entry in (fwd_entry, bwd_entry):
+        assert entry.attn_scale_value.device.type == "cpu"
+        assert entry.attn_scale_value.dtype == torch.float32
+        assert entry.attn_scale_value.shape == (1, 1, 1, 1)
+        assert entry.attn_scale_value.item() == 0.5
+    assert heuristic_calls == [
+        [FakeCudnn.heur_mode.A],
+        [FakeCudnn.heur_mode.A],
     ]
 
     events.clear()
@@ -141,6 +209,7 @@ def test_python_frontend_graph_build_nvtx_ranges(monkeypatch):
         True, q, k, v, "bshd", "bshd", 0.5, "no_mask", o, stats
     )
     assert not events
+    assert heuristic_calls[-1] is None
 
 
 def test_python_frontend_graph_cache_reset():
@@ -174,6 +243,8 @@ def test_python_frontend_autograd_plumbing(monkeypatch):
         q = object()
         k = object()
         v = object()
+        attn_scale = object()
+        attn_scale_value = torch.tensor(0.5)
         output = object()
         stats = object()
         workspace_size = 1
@@ -186,6 +257,8 @@ def test_python_frontend_autograd_plumbing(monkeypatch):
         output = object()
         d_output = object()
         stats = object()
+        attn_scale = object()
+        attn_scale_value = torch.tensor(0.5)
         dq = object()
         dk = object()
         dv = object()
@@ -204,10 +277,12 @@ def test_python_frontend_autograd_plumbing(monkeypatch):
 
     def fake_execute(_graph, variant_pack, _workspace_size, _device):
         if BwdEntry.dq in variant_pack:
+            assert variant_pack[BwdEntry.attn_scale] is BwdEntry.attn_scale_value
             variant_pack[BwdEntry.dq].fill_(1.0)
             variant_pack[BwdEntry.dk].fill_(2.0)
             variant_pack[BwdEntry.dv].fill_(3.0)
         else:
+            assert variant_pack[FwdEntry.attn_scale] is FwdEntry.attn_scale_value
             variant_pack[FwdEntry.output].copy_(variant_pack[FwdEntry.q])
 
     monkeypatch.setattr(cudnn_attention, "_execute_cudnn_graph", fake_execute)
@@ -310,11 +385,15 @@ def test_cpp_zero_dropout_does_not_advance_cuda_rng(is_training):
         dtype=torch.int32,
         device="cuda",
     )
-    attention = FusedAttention(
-        head_dim**-0.5,
-        attention_dropout=0.0,
-        fused_attention_impl="cpp",
-    ).cuda().train(is_training)
+    attention = (
+        FusedAttention(
+            head_dim**-0.5,
+            attention_dropout=0.0,
+            fused_attention_impl="cpp",
+        )
+        .cuda()
+        .train(is_training)
+    )
     kwargs = {
         "qkv_layout": "bshd_bshd_bshd",
         "cu_seqlens_q": cu_seqlens,

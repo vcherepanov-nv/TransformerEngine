@@ -5,11 +5,17 @@
 """Shared helpers for attention implemented with the cuDNN frontend Python API."""
 
 import importlib
+from contextlib import nullcontext
 from typing import Any
 
 import torch
 
 _cudnn_handles: dict[torch.device, Any] = {}
+
+
+def _null_stage_range(_stage):
+    """Return a no-op context manager for uninstrumented graph building."""
+    return nullcontext()
 
 
 def _import_cudnn_frontend():
@@ -90,20 +96,42 @@ def _build_cudnn_pygraph(dtype: torch.dtype, device: torch.device):
     )
 
 
-def _finalize_cudnn_graph(graph) -> int:
-    """Build a cuDNN frontend Python graph and return its workspace size."""
-    cudnn = _import_cudnn_frontend()
+def _build_cudnn_graph_plans(
+    graph,
+    heuristic_modes=None,
+    *,
+    stage_range=None,
+) -> None:
+    """Build operation graph and execution plans for a validated graph.
 
-    graph.validate()
-    graph.build_operation_graph()
+    ``heuristic_modes`` defaults to the production Python policy. Callers that
+    compare against another frontend can provide the same policy as that path.
+    ``stage_range`` may return a context manager for each native planning stage.
+    """
+    cudnn = _import_cudnn_frontend()
+    if heuristic_modes is None:
+        heuristic_modes = [cudnn.heur_mode.A, cudnn.heur_mode.FALLBACK]
+    range_factory = stage_range or _null_stage_range
+
+    with range_factory("build_operation_graph"):
+        graph.build_operation_graph()
     try:
-        graph.create_execution_plans([cudnn.heur_mode.A, cudnn.heur_mode.FALLBACK])
-        graph.check_support()
+        with range_factory("create_execution_plans"):
+            graph.create_execution_plans(heuristic_modes)
+        with range_factory("check_support"):
+            graph.check_support()
     except cudnn.cudnnGraphNotSupportedError as exc:
         raise RuntimeError(
             f"cuDNN frontend Python attention graph is not supported: {exc}"
         ) from exc
-    graph.build_plans(cudnn.build_plan_policy.HEURISTICS_CHOICE)
+    with range_factory("build_plans"):
+        graph.build_plans(cudnn.build_plan_policy.HEURISTICS_CHOICE)
+
+
+def _finalize_cudnn_graph(graph) -> int:
+    """Build a cuDNN frontend Python graph and return its workspace size."""
+    graph.validate()
+    _build_cudnn_graph_plans(graph)
     return max(graph.get_workspace_size(), 1)
 
 
