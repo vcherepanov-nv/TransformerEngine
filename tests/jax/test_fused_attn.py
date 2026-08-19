@@ -370,6 +370,159 @@ def test_fused_attn_score_mod_rejects_masks_before_cudnn_frontend():
         )
 
 
+def _ordinary_python_frontend_attn(q, k, v, qkv_layout, attn_mask_type, is_training):
+    if qkv_layout == QKVLayout.BS3HD:
+        qkv = (jnp.stack((q, k, v), axis=-3),)
+    elif qkv_layout == QKVLayout.BSHD_BS2HD:
+        qkv = (q, jnp.stack((k, v), axis=-3))
+    else:
+        assert qkv_layout == QKVLayout.BSHD_BSHD_BSHD
+        qkv = (q, k, v)
+    return fused_attn(
+        qkv,
+        None,
+        None,
+        None,
+        AttnBiasType.NO_BIAS,
+        attn_mask_type,
+        qkv_layout,
+        AttnSoftmaxType.VANILLA_SOFTMAX,
+        1.0 / sqrt(q.shape[-1]),
+        0.0,
+        is_training,
+        fused_attention_impl="python",
+    )
+
+
+def _ordinary_attention_reference(q, k, v, attn_mask_type):
+    mask = None
+    if attn_mask_type == AttnMaskType.CAUSAL_MASK:
+        seqlen_q, seqlen_kv = q.shape[1], k.shape[1]
+        mask = jnp.arange(seqlen_q)[:, None] < jnp.arange(seqlen_kv)[None, :]
+        mask = mask[None, None, :, :]
+    return jax_dpa(
+        q,
+        k,
+        v,
+        None,
+        None,
+        mask,
+        None,
+        attn_bias_type=AttnBiasType.NO_BIAS,
+        attn_mask_type=attn_mask_type,
+        softmax_type=AttnSoftmaxType.VANILLA_SOFTMAX,
+        scaling_factor=1.0 / sqrt(q.shape[-1]),
+        dropout_probability=0.0,
+        is_training=False,
+        qkv_layout=QKVLayout.BSHD_BSHD_BSHD,
+    )
+
+
+def test_fused_attn_rejects_invalid_python_frontend_selector():
+    q = jax.ShapeDtypeStruct((1, 16, 1, 64), jnp.float16)
+    with pytest.raises(ValueError, match="must be either 'cpp' or 'python'"):
+        fused_attn(
+            (q, q, q),
+            None,
+            None,
+            None,
+            AttnBiasType.NO_BIAS,
+            AttnMaskType.NO_MASK,
+            QKVLayout.BSHD_BSHD_BSHD,
+            AttnSoftmaxType.VANILLA_SOFTMAX,
+            0.125,
+            0.0,
+            False,
+            fused_attention_impl="invalid",
+        )
+
+
+def test_fused_attn_python_frontend_rejects_unsupported_config_before_graph_build():
+    q = jax.ShapeDtypeStruct((1, 16, 1, 64), jnp.float16)
+    with pytest.raises(ValueError, match="attention dropout is 0.1"):
+        fused_attn(
+            (q, q, q),
+            None,
+            None,
+            None,
+            AttnBiasType.NO_BIAS,
+            AttnMaskType.NO_MASK,
+            QKVLayout.BSHD_BSHD_BSHD,
+            AttnSoftmaxType.VANILLA_SOFTMAX,
+            0.125,
+            0.1,
+            True,
+            fused_attention_impl="python",
+        )
+
+
+@pytest.mark.parametrize(
+    "qkv_layout",
+    [
+        pytest.param(QKVLayout.BS3HD, id="QKV_PACKED"),
+        pytest.param(QKVLayout.BSHD_BS2HD, id="KV_PACKED"),
+        pytest.param(QKVLayout.BSHD_BSHD_BSHD, id="SEPARATE"),
+    ],
+)
+def test_fused_attn_python_frontend_forward(qkv_layout):
+    pytest.importorskip("cudnn")
+    keys = jax.random.split(jax.random.PRNGKey(123), 3)
+    q, k, v = (jax.random.normal(key, (2, 32, 4, 64), dtype=jnp.float16) * 0.5 for key in keys)
+
+    implementation = jax.jit(
+        partial(
+            _ordinary_python_frontend_attn,
+            qkv_layout=qkv_layout,
+            attn_mask_type=AttnMaskType.NO_MASK,
+            is_training=False,
+        )
+    )
+    lowered = implementation.lower(q, k, v)
+    assert "te_cudnn_frontend_attn_forward_ffi" in lowered.as_text()
+    actual = lowered.compile()(q, k, v)
+    expected = _ordinary_attention_reference(q, k, v, AttnMaskType.NO_MASK)
+    np.testing.assert_allclose(actual, expected, rtol=0.05, atol=0.05)
+
+
+def test_fused_attn_python_frontend_backward():
+    pytest.importorskip("cudnn")
+    keys = jax.random.split(jax.random.PRNGKey(321), 4)
+    q = jax.random.normal(keys[0], (2, 24, 8, 64), dtype=jnp.bfloat16) * 0.5
+    k = jax.random.normal(keys[1], (2, 32, 2, 64), dtype=jnp.bfloat16) * 0.5
+    v = jax.random.normal(keys[2], (2, 32, 2, 64), dtype=jnp.bfloat16) * 0.5
+    doutput = jax.random.normal(keys[3], q.shape, dtype=q.dtype)
+
+    def loss(implementation, query, key, value):
+        output = implementation(query, key, value)
+        return jnp.sum(output.astype(jnp.float32) * doutput.astype(jnp.float32))
+
+    implementation = partial(
+        _ordinary_python_frontend_attn,
+        qkv_layout=QKVLayout.BSHD_BSHD_BSHD,
+        attn_mask_type=AttnMaskType.CAUSAL_MASK,
+        is_training=True,
+    )
+    reference = partial(
+        _ordinary_attention_reference,
+        attn_mask_type=AttnMaskType.CAUSAL_MASK,
+    )
+    implementation_grad = jax.jit(
+        jax.value_and_grad(partial(loss, implementation), argnums=(0, 1, 2))
+    )
+    reference_grad = jax.jit(jax.value_and_grad(partial(loss, reference), argnums=(0, 1, 2)))
+
+    lowered = implementation_grad.lower(q, k, v)
+    lowered_text = lowered.as_text()
+    assert "te_cudnn_frontend_attn_forward_ffi" in lowered_text
+    assert "te_cudnn_frontend_attn_backward_ffi" in lowered_text
+    actual_loss, actual_grads = lowered.compile()(q, k, v)
+    expected_loss, expected_grads = reference_grad(q, k, v)
+
+    np.testing.assert_allclose(actual_loss, expected_loss, rtol=0.05, atol=0.05)
+    for actual, expected in zip(actual_grads, expected_grads):
+        np.testing.assert_allclose(actual, expected, rtol=0.08, atol=0.08)
+
+
 class BiasShape(Enum):
     """
     Enum class to represent the different bias shapes used in the fused attention.

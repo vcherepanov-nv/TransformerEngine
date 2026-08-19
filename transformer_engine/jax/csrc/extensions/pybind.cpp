@@ -70,6 +70,14 @@ pybind11::dict Registrations() {
   dict["te_fused_attn_score_mod_backward_ffi"] =
       pybind11::dict(pybind11::arg("prepare") = EncapsulateFFI(CudnnHandleInitHandler),
                      pybind11::arg("execute") = EncapsulateFFI(FusedAttnScoreModBackwardHandler));
+  // Ordinary and score-modified Python-frontend attention share the same serialized-graph
+  // executor. Keep distinct target names so compiled JAX programs clearly identify the path.
+  dict["te_cudnn_frontend_attn_forward_ffi"] =
+      pybind11::dict(pybind11::arg("prepare") = EncapsulateFFI(CudnnHandleInitHandler),
+                     pybind11::arg("execute") = EncapsulateFFI(FusedAttnScoreModForwardHandler));
+  dict["te_cudnn_frontend_attn_backward_ffi"] =
+      pybind11::dict(pybind11::arg("prepare") = EncapsulateFFI(CudnnHandleInitHandler),
+                     pybind11::arg("execute") = EncapsulateFFI(FusedAttnScoreModBackwardHandler));
 
   // GEMM
   dict["te_gemm_ffi"] =

@@ -779,7 +779,7 @@ cudnnHandle_t GetScoreModCudnnHandle() {
 ScoreModGraphCacheKey GetScoreModGraphCacheKey(Dictionary &attrs) {
   const int64_t frontend_version = get_attr_value<int64_t>(attrs, "cudnn_frontend_version");
   NVTE_CHECK(frontend_version == CUDNN_FRONTEND_VERSION,
-             "cuDNN frontend version mismatch for score_mod graph deserialization: graph was "
+             "cuDNN frontend version mismatch for serialized graph deserialization: graph was "
              "serialized with Python cuDNN frontend version ",
              frontend_version,
              ", but Transformer Engine C++ was built with CUDNN_FRONTEND_VERSION ",
@@ -815,7 +815,7 @@ ScoreModGraphPtr GetScoreModGraph(cudaStream_t stream, Dictionary &attrs) {
   auto graph = std::make_shared<cudnn_frontend::graph::Graph>();
   auto status = graph->deserialize(handle, serialized_data);
   NVTE_CHECK(status.is_good(),
-             "Failed to deserialize cuDNN score_mod SDPA graph: ", status.get_message());
+             "Failed to deserialize cuDNN frontend SDPA graph: ", status.get_message());
 
   std::lock_guard<std::mutex> lock(getScoreModGraphCacheMutex());
   auto &cache = getScoreModeGraphCache();
@@ -837,14 +837,14 @@ Error_Type ExecuteScoreModGraph(cudaStream_t stream, Dictionary &attrs,
   auto scalar_sizes = get_attr_value<xla::ffi::Span<const int64_t>>(attrs, "scalar_sizes");
   auto scalar_values = get_attr_value<xla::ffi::Span<const uint8_t>>(attrs, "scalar_values");
 
-  NVTE_CHECK(input_ptrs.size() == input_uids.size(), "cuDNN score_mod graph expected ",
+  NVTE_CHECK(input_ptrs.size() == input_uids.size(), "cuDNN frontend graph expected ",
              input_uids.size(), " inputs but got ", input_ptrs.size());
-  NVTE_CHECK(output_ptrs.size() >= output_uids.size(), "cuDNN score_mod graph expected at least ",
+  NVTE_CHECK(output_ptrs.size() >= output_uids.size(), "cuDNN frontend graph expected at least ",
              output_uids.size(), " outputs but got ", output_ptrs.size());
   NVTE_CHECK(scalar_uids.size() == scalar_sizes.size(),
-             "Mismatched score_mod scalar uid/value-size counts.");
+             "Mismatched cuDNN frontend scalar uid/value-size counts.");
   NVTE_CHECK(scalar_values.size() == scalar_uids.size() * 16,
-             "Mismatched score_mod packed scalar value size.");
+             "Mismatched cuDNN frontend packed scalar value size.");
 
   std::unordered_map<int64_t, void *> variant_pack;
   for (size_t i = 0; i < input_uids.size(); ++i) {
@@ -857,7 +857,7 @@ Error_Type ExecuteScoreModGraph(cudaStream_t stream, Dictionary &attrs,
   std::vector<ScoreModScalarStorage> scalar_storage(scalar_uids.size());
   for (size_t i = 0; i < scalar_uids.size(); ++i) {
     NVTE_CHECK(scalar_sizes[i] >= 0 && scalar_sizes[i] <= 16,
-               "score_mod pass-by-value scalars must be at most 16 bytes.");
+               "cuDNN frontend pass-by-value scalars must be at most 16 bytes.");
     scalar_storage[i].size = static_cast<size_t>(scalar_sizes[i]);
     std::copy_n(scalar_values.begin() + i * 16, 16, scalar_storage[i].data.begin());
     variant_pack.emplace(scalar_uids[i], scalar_storage[i].data.data());
@@ -867,7 +867,7 @@ Error_Type ExecuteScoreModGraph(cudaStream_t stream, Dictionary &attrs,
   NVTE_CHECK_CUDNN(cudnnSetStream(handle, stream));
   auto status = graph->execute(handle, variant_pack, workspace);
   NVTE_CHECK(status.is_good(),
-             "cuDNN score_mod SDPA graph execution failed: ", status.get_message());
+             "cuDNN frontend SDPA graph execution failed: ", status.get_message());
   return ffi_with_cuda_error_check();
 }
 
@@ -875,7 +875,7 @@ void AppendRemainingBuffers(Variadic_Buffer_Type args, std::vector<void *> *ptrs
   ptrs->reserve(ptrs->size() + args.size());
   for (size_t i = 0; i < args.size(); ++i) {
     auto maybe_buf = args.get<Buffer_Type>(i);
-    NVTE_CHECK(!maybe_buf.has_error(), "Failed to decode variadic score_mod input buffer.");
+    NVTE_CHECK(!maybe_buf.has_error(), "Failed to decode variadic cuDNN frontend input buffer.");
     ptrs->push_back(maybe_buf.value().untyped_data());
   }
 }

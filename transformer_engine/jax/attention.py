@@ -5,7 +5,7 @@
 from __future__ import annotations
 from enum import Enum
 from functools import partial
-from typing import Any, Callable, Mapping, Optional, Tuple, Union
+from typing import Any, Callable, Literal, Mapping, Optional, Tuple, Union
 import warnings
 
 from jax.ad_checkpoint import checkpoint_name
@@ -1444,6 +1444,62 @@ def _fused_attn_score_mod_bwd_rule(config, context_checkpoint_name, ctx, dz):
 _fused_attn_score_mod.defvjp(_fused_attn_score_mod_fwd_rule, _fused_attn_score_mod_bwd_rule)
 
 
+def _normalize_python_frontend_qkv(
+    qkv: Tuple[jnp.ndarray, ...], qkv_layout: QKVLayout
+) -> Tuple[Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray], QKVLayout]:
+    """Convert dense packed layouts to the separate BSHD Python-frontend layout."""
+    if qkv_layout.is_thd():
+        raise ValueError("fused_attention_impl='python' does not support THD/ragged QKV layouts.")
+    if qkv_layout.is_qkvpacked():
+        if len(qkv) != 1:
+            raise ValueError(f"Expected one packed QKV tensor for {qkv_layout}, got {len(qkv)}.")
+        query, key, value = jnp.split(qkv[0], [1, 2], axis=-3)
+        query, key, value = map(
+            partial(jnp.squeeze, axis=-3),
+            (query, key, value),
+        )
+        return (query, key, value), QKVLayout.BSHD_BSHD_BSHD
+    if qkv_layout.is_kvpacked():
+        if len(qkv) != 2:
+            raise ValueError(f"Expected query and packed KV for {qkv_layout}, got {len(qkv)}.")
+        key, value = jnp.split(qkv[1], [1], axis=-3)
+        key, value = map(partial(jnp.squeeze, axis=-3), (key, value))
+        return (qkv[0], key, value), QKVLayout.BSHD_BSHD_BSHD
+    if qkv_layout == QKVLayout.BSHD_BSHD_BSHD:
+        if len(qkv) != 3:
+            raise ValueError(f"Expected separate query, key, and value, got {len(qkv)} tensors.")
+        return (qkv[0], qkv[1], qkv[2]), qkv_layout
+    raise ValueError(f"fused_attention_impl='python' does not support {qkv_layout=}.")
+
+
+@partial(jax.custom_vjp, nondiff_argnums=(1, 2))
+def _fused_attn_cudnn(
+    qkv: Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray],
+    config,
+    context_checkpoint_name: str,
+):
+    """Ordinary fused attention through a Python-built serialized cuDNN graph."""
+    output, _ = _fused_attn_cudnn_fwd_rule(qkv, config, context_checkpoint_name)
+    return output
+
+
+def _fused_attn_cudnn_fwd_rule(qkv, config, context_checkpoint_name):
+    output, softmax_stats = tex.fused_attn_cudnn_fwd(qkv, config)
+    output = checkpoint_name(output, context_checkpoint_name)
+    softmax_stats = checkpoint_name(softmax_stats, context_checkpoint_name)
+    return output, (qkv, output, softmax_stats)
+
+
+def _fused_attn_cudnn_bwd_rule(config, context_checkpoint_name, ctx, dz):
+    del context_checkpoint_name
+    qkv, output, softmax_stats = ctx
+    grad_qkv = tex.fused_attn_cudnn_bwd(qkv, output, dz, softmax_stats, config)
+    return (grad_qkv,)
+
+
+_fused_attn_cudnn.defvjp(_fused_attn_cudnn_fwd_rule, _fused_attn_cudnn_bwd_rule)
+
+
 def fused_attn(
     qkv: Tuple[jnp.ndarray, ...],
     bias: Optional[jnp.ndarray],
@@ -1468,6 +1524,7 @@ def fused_attn(
     score_mod_bprop: Optional[Callable] = None,
     score_mod_tensors: Optional[Mapping[str, Any]] = None,
     score_mod_bprop_tensors: Optional[Mapping[str, Any]] = None,
+    fused_attention_impl: Literal["cpp", "python"] = "cpp",
 ):
     """
     Perform cuDNN fused attention.
@@ -1524,6 +1581,10 @@ def fused_attn(
             non-differentiable auxiliary inputs.
         score_mod_bprop_tensors (Optional[Mapping[str, Any]]): Additional tensors or
             Python/NumPy scalars made available to `score_mod_bprop`.
+        fused_attention_impl ({'cpp', 'python'}): Implementation used for ordinary fused
+            attention. ``'cpp'`` uses Transformer Engine's existing compiled path;
+            ``'python'`` builds and serializes an SDPA graph with the cuDNN frontend Python API.
+            The selector does not affect the existing ``score_mod`` Python-frontend path.
     Returns:
         (jnp.ndarray): The output tensor from the fused attention.
 
@@ -1556,6 +1617,11 @@ def fused_attn(
                              AttnBiasType.NO_BIAS, AttnMaskType.PADDING_CAUSAL_MASK,
                              QKVLayout.T3HD, 0.125, 0, True, 3)
     """
+    if fused_attention_impl not in ("cpp", "python"):
+        raise ValueError(
+            f"fused_attention_impl must be either 'cpp' or 'python', got {fused_attention_impl!r}."
+        )
+
     if score_mod is None:
         score_mod_only_args = [
             name
@@ -1602,6 +1668,33 @@ def fused_attn(
             config,
             context_checkpoint_name,
         )
+
+    if fused_attention_impl == "python":
+        qkv, qkv_layout = _normalize_python_frontend_qkv(qkv, qkv_layout)
+        tex.validate_cudnn_attention(
+            qkv,
+            bias,
+            sequence_descriptor,
+            seed,
+            attn_bias_type,
+            attn_mask_type,
+            qkv_layout,
+            softmax_type,
+            dropout_probability,
+            max_segments_per_seq,
+            window_size,
+            context_parallel_strategy,
+            context_parallel_causal_load_balanced,
+            context_parallel_axis,
+            softmax_offset,
+            stripe_size,
+        )
+        config = tex.make_cudnn_attention_config(
+            scaling_factor,
+            is_training,
+            attn_mask_type,
+        )
+        return _fused_attn_cudnn(qkv, config, context_checkpoint_name)
 
     if sequence_descriptor is None or isinstance(sequence_descriptor, jnp.ndarray):
         warnings.warn(

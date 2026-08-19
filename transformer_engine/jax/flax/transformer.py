@@ -8,7 +8,7 @@ import functools
 from enum import Enum
 from math import sqrt
 import os
-from typing import Any, Callable, Mapping, Optional, Sequence, Tuple, Union
+from typing import Any, Callable, Literal, Mapping, Optional, Sequence, Tuple, Union
 import warnings
 
 import jax
@@ -308,6 +308,7 @@ class _FusedDotProductAttention(nn.Module):  # pylint: disable=too-few-public-me
     score_mod: Optional[Callable] = None
     score_mod_bprop: Optional[Callable] = None
     score_mod_requested: bool = False
+    fused_attention_impl: Literal["cpp", "python"] = "cpp"
 
     @nn.compact
     def __call__(
@@ -363,6 +364,7 @@ class _FusedDotProductAttention(nn.Module):  # pylint: disable=too-few-public-me
             "score_mod_bprop": self.score_mod_bprop,
             "score_mod_tensors": score_mod_tensors,
             "score_mod_bprop_tensors": score_mod_bprop_tensors,
+            "fused_attention_impl": self.fused_attention_impl,
         }
 
         if self.qkv_layout.is_qkvpacked():
@@ -619,6 +621,10 @@ class DotProductAttention(nn.Module):  # pylint: disable=too-few-public-methods
         argument to keep tensor operands as normal JAX inputs.
     score_mod_bprop_tensors: Optional[Mapping[str, Any]], default = None
         Additional tensors or pass-by-value scalars for ``score_mod_bprop``.
+    fused_attention_impl: {'cpp', 'python'}, default = 'cpp'
+        Implementation used after fused attention is selected. ``'cpp'`` uses Transformer
+        Engine's existing compiled path; ``'python'`` builds and serializes an SDPA graph with
+        the cuDNN frontend Python API. Unsupported Python-frontend configurations raise an error.
 
     Optimization parameters
     -----------------------
@@ -647,8 +653,14 @@ class DotProductAttention(nn.Module):  # pylint: disable=too-few-public-methods
     softmax_type: str = "vanilla"
     score_mod: Optional[Callable] = None
     score_mod_bprop: Optional[Callable] = None
+    fused_attention_impl: Literal["cpp", "python"] = "cpp"
 
     def __post_init__(self):
+        if self.fused_attention_impl not in ("cpp", "python"):
+            raise ValueError(
+                "fused_attention_impl must be either 'cpp' or 'python', "
+                f"got {self.fused_attention_impl!r}."
+            )
         # TODO(KshitijLakhani): Remove warning in TransformerEngine v2.12
         # None implies that the user is relying on defaults, hence warn the user and set the new defaults
         if self.transpose_batch_sequence is None:
@@ -794,7 +806,14 @@ class DotProductAttention(nn.Module):  # pylint: disable=too-few-public-methods
         if score_mod_requested:
             if not enable_fused_attn:
                 raise ValueError("score_mod requires fused attention, but NVTE_FUSED_ATTN=0.")
-        kernel_qkv_layout = qkv_layout.to_separate() if score_mod_requested else qkv_layout
+        python_frontend_requested = (
+            self.fused_attention_impl == "python" and not score_mod_requested
+        )
+        kernel_qkv_layout = (
+            qkv_layout.to_separate()
+            if score_mod_requested or python_frontend_requested
+            else qkv_layout
+        )
         has_fused_attn_kernel = is_fused_attn_kernel_available(
             # This needs to be fixed: TE-Jax has historically correlated training mode
             # with deterministic mode.
@@ -916,6 +935,7 @@ class DotProductAttention(nn.Module):  # pylint: disable=too-few-public-methods
                 score_mod=self.score_mod,
                 score_mod_bprop=self.score_mod_bprop,
                 score_mod_requested=score_mod_requested,
+                fused_attention_impl=self.fused_attention_impl,
             )(
                 query,
                 key,
@@ -1234,6 +1254,9 @@ class MultiHeadAttention(nn.Module):  # pylint: disable=too-few-public-methods
         argument to keep tensor operands as normal JAX inputs.
     score_mod_bprop_tensors: Optional[Mapping[str, Any]], default = None
         Additional tensors or pass-by-value scalars for ``score_mod_bprop``.
+    fused_attention_impl: {'cpp', 'python'}, default = 'cpp'
+        Implementation used after fused attention is selected. ``'cpp'`` uses Transformer
+        Engine's existing compiled path; ``'python'`` uses the cuDNN frontend Python API.
     """
 
     head_dim: int
@@ -1268,6 +1291,7 @@ class MultiHeadAttention(nn.Module):  # pylint: disable=too-few-public-methods
     softmax_type: str = "vanilla"
     score_mod: Optional[Callable] = None
     score_mod_bprop: Optional[Callable] = None
+    fused_attention_impl: Literal["cpp", "python"] = "cpp"
 
     # Deprecated parameters
     num_heads: Optional[int] = None
@@ -1277,6 +1301,11 @@ class MultiHeadAttention(nn.Module):  # pylint: disable=too-few-public-methods
     fuse_qkv: Optional[bool] = None
 
     def __post_init__(self):
+        if self.fused_attention_impl not in ("cpp", "python"):
+            raise ValueError(
+                "fused_attention_impl must be either 'cpp' or 'python', "
+                f"got {self.fused_attention_impl!r}."
+            )
         # Deal with changed defaults in API
         # TODO(KshitijLakhani): Remove warning in TransformerEngine v2.12
         # None implies that the user is relying on defaults, hence warn the user and set the new defaults
@@ -1697,6 +1726,7 @@ class MultiHeadAttention(nn.Module):  # pylint: disable=too-few-public-methods
             softmax_type=self.softmax_type,
             score_mod=self.score_mod,
             score_mod_bprop=self.score_mod_bprop,
+            fused_attention_impl=self.fused_attention_impl,
         )(
             *dpa_args,
             mask,
@@ -2023,6 +2053,10 @@ class TransformerLayer(nn.Module):  # pylint: disable=too-few-public-methods
         argument to keep tensor operands as normal JAX inputs.
     score_mod_bprop_tensors: Optional[Mapping[str, Any]], default = None
         Additional tensors or pass-by-value scalars for ``score_mod_bprop``.
+    fused_attention_impl: {'cpp', 'python'}, default = 'cpp'
+        Implementation used by fused attention in the attention blocks. ``'cpp'`` uses
+        Transformer Engine's existing compiled path; ``'python'`` uses the cuDNN frontend
+        Python API.
 
     Optimization parameters
     -----------------------
@@ -2091,8 +2125,14 @@ class TransformerLayer(nn.Module):  # pylint: disable=too-few-public-methods
     softmax_type: str = "vanilla"
     score_mod: Optional[Callable] = None
     score_mod_bprop: Optional[Callable] = None
+    fused_attention_impl: Literal["cpp", "python"] = "cpp"
 
     def __post_init__(self):
+        if self.fused_attention_impl not in ("cpp", "python"):
+            raise ValueError(
+                "fused_attention_impl must be either 'cpp' or 'python', "
+                f"got {self.fused_attention_impl!r}."
+            )
         if self.mha_kernel_init is None:
             self.mha_kernel_init = nn.initializers.variance_scaling(
                 1.0, "fan_in", "normal", dtype=self.dtype
@@ -2262,6 +2302,7 @@ class TransformerLayer(nn.Module):  # pylint: disable=too-few-public-methods
             softmax_type=self.softmax_type,
             score_mod=self.score_mod,
             score_mod_bprop=self.score_mod_bprop,
+            fused_attention_impl=self.fused_attention_impl,
         )(
             inputs,
             inputs,
@@ -2357,6 +2398,7 @@ class TransformerLayer(nn.Module):  # pylint: disable=too-few-public-methods
                 name="encoder_decoder_attention",
                 window_size=self.window_size,
                 softmax_type=self.softmax_type,
+                fused_attention_impl=self.fused_attention_impl,
             )(x, encoded, encoder_decoder_mask, deterministic=deterministic)
 
             y = with_sharding_constraint_by_logical_axes(
