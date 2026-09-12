@@ -256,6 +256,24 @@ def _is_paged_layout(qkv_layout: str) -> bool:
     return qkv_layout.startswith("paged_kv_")
 
 
+def _make_page_table_graph_tensor(
+    graph, page_table: torch.Tensor, *, batch: int, name: str
+):
+    """Describe a physical ``[batch, pages]`` table in cuDNN's logical layout."""
+
+    if page_table.ndim != 2:
+        raise ValueError(
+            f"Paged attention expects a 2D page table, got shape {tuple(page_table.shape)}."
+        )
+    batch_stride, page_stride = page_table.stride()
+    return graph.tensor(
+        name=name,
+        dim=(batch, 1, page_table.shape[1], 1),
+        stride=(batch_stride, batch_stride, page_stride, page_stride),
+        data_type=page_table.dtype,
+    )
+
+
 def _tensor_metadata(tensor: Optional[torch.Tensor]) -> Optional[Tuple[Any, ...]]:
     if tensor is None:
         return None
@@ -660,8 +678,12 @@ def _build_f16_fwd_graph(
         options["seq_len_kv"] = seq_kv_t
 
     if page_table_k is not None:
-        page_k_t = graph.tensor_like(page_table_k, name="page_table_k")
-        page_v_t = graph.tensor_like(page_table_v, name="page_table_v")
+        page_k_t = _make_page_table_graph_tensor(
+            graph, page_table_k, batch=graph_batch, name="page_table_k"
+        )
+        page_v_t = _make_page_table_graph_tensor(
+            graph, page_table_v, batch=graph_batch, name="page_table_v"
+        )
         tensors["page_table_k"] = page_k_t
         tensors["page_table_v"] = page_v_t
         options["paged_attention_k_table"] = page_k_t

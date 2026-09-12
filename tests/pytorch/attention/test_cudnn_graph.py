@@ -8,7 +8,31 @@ import weakref
 
 import torch
 
-from transformer_engine.pytorch.attention.dot_product_attention import _cudnn_graph
+from transformer_engine.pytorch.attention.dot_product_attention import (
+    _cudnn_graph,
+    cudnn_attention,
+)
+
+
+def test_page_table_uses_cudnn_logical_layout():
+    """cuDNN paged attention requires a four-dimensional table descriptor."""
+
+    class Graph:
+        @staticmethod
+        def tensor(**kwargs):
+            return kwargs
+
+    page_table = torch.empty_strided((3, 4), (6, 1), dtype=torch.int32)
+    graph_tensor = cudnn_attention._make_page_table_graph_tensor(
+        Graph(), page_table, batch=2, name="page_table_k"
+    )
+
+    assert graph_tensor == {
+        "name": "page_table_k",
+        "dim": (2, 1, 4, 1),
+        "stride": (6, 6, 1, 1),
+        "data_type": torch.int32,
+    }
 
 
 def test_graph_entry_does_not_retain_execution_workspaces(monkeypatch):
