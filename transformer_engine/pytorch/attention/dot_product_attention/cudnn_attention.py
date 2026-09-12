@@ -256,9 +256,7 @@ def _is_paged_layout(qkv_layout: str) -> bool:
     return qkv_layout.startswith("paged_kv_")
 
 
-def _make_page_table_graph_tensor(
-    graph, page_table: torch.Tensor, *, batch: int, name: str
-):
+def _make_page_table_graph_tensor(graph, page_table: torch.Tensor, *, batch: int, name: str):
     """Describe a physical ``[batch, pages]`` table in cuDNN's logical layout."""
 
     if page_table.ndim != 2:
