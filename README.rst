@@ -160,11 +160,11 @@ System Requirements
 * **Software:**
 
   * CUDA: 12.1+ (Hopper/Ada/Ampere), 12.8+ (Blackwell) with compatible NVIDIA drivers
-  * cuDNN: 9.3+
+  * cuDNN: 9.12+
   * Compiler: GCC 9+ or Clang 10+ with C++17 support
   * Python: 3.12 recommended
 
-* **Source Build Requirements:** CMake 3.18+, Ninja, Git 2.17+, pybind11 2.6.0+
+* **Source Build Requirements:** CMake 3.18+, Ninja, Git 2.17+, pybind11 2.6.0+, nvidia-cudnn-frontend 1.25.0+
 
 * **Notes:** FP8 features require Compute Capability 8.9+ (Ada/Hopper/Blackwell)
 
