@@ -60,13 +60,17 @@ heuristic mode. Graph-build durations are reported by the inclusive
 adds ``ir_definition`` and ``lowering_and_native_validation`` detail;
 C++ adds ``native_definition`` and ``native_validation`` detail. Forward-only mode
 builds an inference graph, while forward-plus-backward mode builds a training
-forward graph with softmax statistics.
+forward graph with softmax statistics. Measured iterations also have separate
+``forward_call`` and ``backward_call`` NVTX ranges around the same PyTorch calls
+for both implementations. Range names repeat by default for Nsight aggregation;
+use ``--nvtx-iteration-numbers`` to distinguish them.
 """
 
 import argparse
 import os
 import statistics
 import time
+from contextlib import nullcontext
 from typing import Literal
 
 import torch
@@ -94,10 +98,7 @@ def _parse_args() -> argparse.Namespace:
         "--measure",
         choices=("runtime", "graph_creation"),
         default="runtime",
-        help=(
-            "Measure steady-state runtime or warmed-process, cold-cache cuDNN "
-            "graph construction."
-        ),
+        help="Measure steady-state runtime or warmed-process, cold-cache cuDNN graph construction.",
     )
     parser.add_argument(
         "--shape",
@@ -129,6 +130,11 @@ def _parse_args() -> argparse.Namespace:
         help="Bracket measured iterations with cudaProfilerStart/Stop for nsys capture-range.",
     )
     parser.add_argument(
+        "--nvtx-iteration-numbers",
+        action="store_true",
+        help="Append zero-based iteration numbers to per-iteration NVTX range names.",
+    )
+    parser.add_argument(
         "--match-cpp-graph-build",
         action="store_true",
         help=(
@@ -143,6 +149,14 @@ def _parse_args() -> argparse.Namespace:
     return args
 
 
+def _nvtx_iteration_name(base: str, iteration: int, number_iterations: bool) -> str:
+    return f"{base}_{iteration}" if number_iterations else base
+
+
+def _optional_nvtx_range(name: str | None):
+    return torch.cuda.nvtx.range(name) if name is not None else nullcontext()
+
+
 def _run_step(
     attention,
     query: torch.Tensor,
@@ -151,33 +165,37 @@ def _run_step(
     d_out: torch.Tensor | None,
     mask: Literal["causal", "no_mask"],
     run_backward: bool,
+    *,
+    forward_range_name: str | None = None,
+    backward_range_name: str | None = None,
 ):
     if run_backward:
-        output = attention(
-            query,
-            key,
-            value,
-            qkv_format="bshd",
-            attn_mask_type=mask,
-        )
-        grads = torch.autograd.grad(
-            output,
-            (query, key, value),
-            grad_outputs=d_out,
-        )
-        return output, grads
-
-    with torch.no_grad():
-        return (
-            attention(
+        with _optional_nvtx_range(forward_range_name):
+            output = attention(
                 query,
                 key,
                 value,
                 qkv_format="bshd",
                 attn_mask_type=mask,
-            ),
-            None,
-        )
+            )
+        with _optional_nvtx_range(backward_range_name):
+            grads = torch.autograd.grad(
+                output,
+                (query, key, value),
+                grad_outputs=d_out,
+            )
+        return output, grads
+
+    with torch.no_grad():
+        with _optional_nvtx_range(forward_range_name):
+            output = attention(
+                query,
+                key,
+                value,
+                qkv_format="bshd",
+                attn_mask_type=mask,
+            )
+        return output, None
 
 
 def _set_graph_build_profiling(impl: str, enabled: bool, tex, cudnn_attention) -> None:
@@ -228,7 +246,16 @@ def _benchmark_graph_creation(
     try:
         for trial in range(args.iterations):
             _reset_graph_cache(args.impl, tex, cudnn_attention)
-            with torch.cuda.nvtx.range(f"{range_prefix}_trial_{trial}"):
+            trial_range_name = _nvtx_iteration_name(
+                f"{range_prefix}_trial", trial, args.nvtx_iteration_numbers
+            )
+            forward_range_name = _nvtx_iteration_name(
+                f"{range_prefix}_forward_call", trial, args.nvtx_iteration_numbers
+            )
+            backward_range_name = _nvtx_iteration_name(
+                f"{range_prefix}_backward_call", trial, args.nvtx_iteration_numbers
+            )
+            with torch.cuda.nvtx.range(trial_range_name):
                 _run_step(
                     attention,
                     query,
@@ -237,6 +264,8 @@ def _benchmark_graph_creation(
                     d_out,
                     args.mask,
                     run_backward,
+                    forward_range_name=forward_range_name,
+                    backward_range_name=backward_range_name,
                 )
             torch.cuda.synchronize(device)
     finally:
@@ -257,17 +286,13 @@ def _benchmark_graph_creation(
 def main() -> None:
     args = _parse_args()
     if args.warmup < 1:
-        raise ValueError(
-            "--warmup must be at least 1 so graph construction is outside capture."
-        )
+        raise ValueError("--warmup must be at least 1 so graph construction is outside capture.")
     if args.iterations < 1:
         raise ValueError("--iterations must be at least 1.")
     if args.match_cpp_graph_build and not (
         args.impl == "python" and args.measure == "graph_creation"
     ):
-        raise ValueError(
-            "--match-cpp-graph-build requires --impl python --measure graph_creation."
-        )
+        raise ValueError("--match-cpp-graph-build requires --impl python --measure graph_creation.")
 
     # The implementation selector only applies after FusedAttention is chosen.
     os.environ["NVTE_FLASH_ATTN"] = "0"
@@ -300,9 +325,7 @@ def main() -> None:
 
     torch.manual_seed(1234)
     query, key, value = [
-        (0.01 * torch.randn(shape, dtype=dtype, device=device)).requires_grad_(
-            run_backward
-        )
+        (0.01 * torch.randn(shape, dtype=dtype, device=device)).requires_grad_(run_backward)
         for _ in range(3)
     ]
     output_shape = (
@@ -310,9 +333,7 @@ def main() -> None:
         args.sequence_length,
         args.num_heads * args.head_dim,
     )
-    d_out = (
-        torch.randn(output_shape, dtype=dtype, device=device) if run_backward else None
-    )
+    d_out = torch.randn(output_shape, dtype=dtype, device=device) if run_backward else None
 
     attention = DotProductAttention(
         num_attention_heads=args.num_heads,
@@ -339,9 +360,7 @@ def main() -> None:
     torch.cuda.synchronize(device)
 
     if not _attention_backends["use_fused_attention"]:
-        raise RuntimeError(
-            "FusedAttention was not selected despite the forced backend settings."
-        )
+        raise RuntimeError("FusedAttention was not selected despite the forced backend settings.")
 
     if args.measure == "graph_creation":
         _benchmark_graph_creation(
@@ -373,6 +392,9 @@ def main() -> None:
     start.record()
     cpu_submit_times_ns = []
     cpu_range_name = f"{range_name}_cpu_submit"
+    iteration_range_base = cpu_range_name if args.cpu_overhead else f"{range_name}_iteration"
+    forward_range_base = f"{range_name}_forward_call"
+    backward_range_base = f"{range_name}_backward_call"
     torch.cuda.nvtx.range_push(range_name)
     try:
         for iteration in range(args.iterations):
@@ -380,9 +402,15 @@ def main() -> None:
                 # Drain the previous iteration outside the measured CPU range. This
                 # prevents a deep GPU queue from moving backpressure into submission.
                 torch.cuda.synchronize(device)
-                iteration_range_name = cpu_range_name
-            else:
-                iteration_range_name = f"{range_name}_iteration_{iteration}"
+            iteration_range_name = _nvtx_iteration_name(
+                iteration_range_base, iteration, args.nvtx_iteration_numbers
+            )
+            forward_range_name = _nvtx_iteration_name(
+                forward_range_base, iteration, args.nvtx_iteration_numbers
+            )
+            backward_range_name = _nvtx_iteration_name(
+                backward_range_base, iteration, args.nvtx_iteration_numbers
+            )
             torch.cuda.nvtx.range_push(iteration_range_name)
             cpu_start_ns = time.perf_counter_ns()
             try:
@@ -394,6 +422,8 @@ def main() -> None:
                     d_out,
                     args.mask,
                     run_backward,
+                    forward_range_name=forward_range_name,
+                    backward_range_name=backward_range_name,
                 )
             finally:
                 cpu_submit_times_ns.append(time.perf_counter_ns() - cpu_start_ns)

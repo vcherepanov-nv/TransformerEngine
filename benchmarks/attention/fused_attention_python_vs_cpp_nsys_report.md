@@ -130,9 +130,9 @@ The script records the same direct timer in queued mode but does not print it un
 
 ### NVTX CPU submission and CPU iteration
 
-In serialized mode, all measured calls use the `..._cpu_submit` NVTX name. Nsight's `nvtx_sum` groups those ranges and reports their count, total, mean, median, minimum, maximum, and standard deviation. The report cites the NVTX mean separately as an independent check of the direct CPU timer. The NVTX envelope starts just before `perf_counter_ns()` and ends just after the direct duration is appended, so it is slightly wider than the direct timer.
+In the serialized profiles used for this report, all measured calls used the `..._cpu_submit` NVTX name. The current script still uses that repeated name by default; `--nvtx-iteration-numbers` adds an index. Nsight's `nvtx_sum` groups the repeated ranges and reports their count, total, mean, median, minimum, maximum, and standard deviation. The report cites the NVTX mean separately as an independent check of the direct CPU timer. The NVTX envelope starts just before `perf_counter_ns()` and ends just after the direct duration is appended, so it is slightly wider than the direct timer.
 
-In queued mode, each call uses a unique `..._iteration_<index>` NVTX range. The `CPU iteration` columns are calculated directly from those ranges:
+In the queued profiles used for this report, each call used a unique `..._iteration_<index>` NVTX range. The current script uses a repeated `..._iteration` name by default so Nsight can aggregate calls; `--nvtx-iteration-numbers` restores the numbered names. The `CPU iteration` columns are calculated directly from the captured ranges:
 
 ```text
 cpu_iteration_i_us = (iteration_end_i_ns - iteration_start_i_ns) / 1,000
@@ -142,15 +142,18 @@ CPU iteration median = median(cpu_iteration_i_us)
 
 All `N` ranges are included, including the first captured iteration. The range includes forward, optional autograd/backward submission, replacement and release of the previous returned objects, the two `perf_counter_ns()` calls, and appending the direct duration. It excludes iteration-name construction, the NVTX push call itself, final CUDA-event handling, and final synchronization. Because no per-iteration synchronization is present, it normally measures asynchronous submission rather than GPU completion, except where a CUDA API or queue backpressure blocks the host.
 
-The equivalent SQLite selection is:
+The following SQLite selection accepts both naming forms:
 
 ```sql
 SELECT n.start, n.end
 FROM NVTX_EVENTS AS n
 LEFT JOIN StringIds AS s ON s.id = n.textId
-WHERE COALESCE(n.text, s.value) LIKE '%_iteration_%'
+WHERE COALESCE(n.text, s.value) GLOB '*_iteration'
+   OR COALESCE(n.text, s.value) GLOB '*_iteration_[0-9]*'
 ORDER BY n.start;
 ```
+
+The current script also nests `..._forward_call` and `..._backward_call` ranges inside each measured iteration. They bracket the same `attention(...)` and `torch.autograd.grad(...)` calls for C++ and Python. Their NVTX durations include host work and asynchronous GPU submission, so they are not GPU kernel durations. These child ranges were not present in the historical profiles summarized here.
 
 ### CUDA launch API time
 
