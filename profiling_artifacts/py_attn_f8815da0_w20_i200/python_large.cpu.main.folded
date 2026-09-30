@@ -1,0 +1,244 @@
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe67c;0xffff05ae2d1c;0xffff05ae2ef4;0xffff05ad7958 358
+[Broken backtraces];0xfffff7fa0850;0xfffff7fa0588 144
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe67c;0xffff05ae2d1c;0xffff05ae2ef4;0xffff05ad7924 65
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe67c;0xffff05ae2d1c;0xffff05ae2ef4;0xffff05ad795c 38
+[Broken backtraces];0xfffff7fa0850;0xfffff7fa0578 38
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe67c;0xffff05ae2d1c;0xffff05ae2ef4;0xffff05ad7970 32
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe67c;0xffff05ae2d1c;0xffff05ae2ef4;0xffff05ad7a50 28
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe67c;0xffff05ae2d1c;0xffff05ae2ef4;0xffff05ad7960 27
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe67c;0xffff05ae2d1c;0xffff05ae2ef4;0xffff05ad791c 23
+[Broken backtraces];0xfffff7fa0850;0xfffff7fa056c 19
+_PyEval_EvalFrameDefault 19
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608ac 18
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe428;0xffff05bbf098 15
+[Broken backtraces];0xfffff7fa0850;0xfffff7fa057c 15
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe67c;0xffff05ae2d1c;0xffff05ae2ef4;0xffff05ad796c 14
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe4b4;0xffff05bbfb24 13
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe67c;0xffff05ae2d1c;0xffff05ae2ef4;0xffff05ad7a60 13
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe4b4;0xffff05bbfb28 10
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe67c;0xffff05ae2d1c;0xffff05ae2ef4;0xffff05ad78e4 10
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe67c;0xffff05ae2d1c;0xffff05ae2ef4;0xffff05ad7914 10
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe67c;0xffff05ae2d1c;0xffff05ae2ef4;0xffff05ad7a54 10
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe67c;0xffff05ae2d1c;0xffff05ae2ef4;0xffff05ad7a58 10
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe4b4;0xffff05bbfacc 9
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe67c;0xffff05ae2d1c;0xffff05ae2ef4;0xffff05ad7904 9
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe67c;0xffff05ae2d1c;0xffff05ae2ef4;0xffff05ad78d8 8
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe67c;0xffff05ae2d1c;0xffff05ae2ef4;0xffff05ad78f4 8
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe67c;0xffff05ae2d1c;0xffff05ae2ef4;0xffff05ad790c 8
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe67c;0xffff05ae2d1c;0xffff05ae2ef4;0xffff05ad7964 8
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe67c;0xffff05ae2d1c;0xffff05ae2ef4;0xffff05ad78fc 7
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe47c 6
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe67c;0xffff05ae2d1c;0xffff05ae2ef4;0xffff05ad78e8 6
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe67c;0xffff05ae2d1c;0xffff05ae2ef4;0xffff05ad7934 6
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe67c;0xffff05ae2d1c;0xffff05ae2ef4;0xffff05ad7938 6
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe67c;0xffff05ae2d1c;0xffff05ae2ef4;0xffff05ad793c 6
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe67c;0xffff05ae2d1c;0xffff05ae2ef4;0xffff05ad7944 6
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe67c;0xffff05ae2d1c;0xffff05ae2ef4;0xffff05ad7950 6
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe428;0xffff05bbef98 5
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe67c;0xffff05ae2d1c;0xffff05ae2ef4;0xffff05ad78d0 5
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe67c;0xffff05ae2d1c;0xffff05ae2ef4;0xffff05ad78d4 5
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe67c;0xffff05ae2d1c;0xffff05ae2ef4;0xffff05ad78e0 5
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe67c;0xffff05ae2d1c;0xffff05ae2ef4;0xffff05ad7908 5
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe67c;0xffff05ae2d1c;0xffff05ae2ef4;0xffff05ad7920 5
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe67c;0xffff05ae2d1c;0xffff05ae2ef4;0xffff05ad7930 5
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe430 4
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe67c;0xffff05ae2d1c;0xffff05ae2ef4;0xffff05ad78ec 4
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe67c;0xffff05ae2d1c;0xffff05ae2ef4;0xffff05ad7900 4
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe67c;0xffff05ae2d1c;0xffff05ae2ef4;0xffff05ad7928 4
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe67c;0xffff05ae2d1c;0xffff05ae2ef4;0xffff05ad7940 4
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe67c;0xffff05ae2d1c;0xffff05ae2ef4;0xffff05ad7948 4
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe42c 3
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe488 3
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe67c;0xffff05ae2d1c;0xffff05ae2ef4;0xffff05ad792c 3
+[Broken backtraces];0x50332c;PyUFunc_GenericReduction;PyUFunc_ReduceWrapper;NpyIter_AdvancedNew 3
+PyObject_Free 2
+PyObject_Malloc 2
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b60890 2
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe428;0xffff05bbeea8 2
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe428;0xffff05bbeec8 2
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe428;0xffff05bbef90 2
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe428;0xffff05bbf080 2
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe4a0 2
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe4b4;0xffff05bbfab0 2
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe4b8 2
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe674 2
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe67c;0xffff05ae2d10 2
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe67c;0xffff05ae2d1c;0xffff05ae2e68 2
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe67c;0xffff05ae2d1c;0xffff05ae2ef4;0xffff05ad78c8 2
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe67c;0xffff05ae2d1c;0xffff05ae2ef4;0xffff05ad7910 2
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe67c;0xffff05ae2d1c;0xffff05ae2ef4;0xffff05ad7918 2
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe67c;0xffff05ae2d1c;0xffff05ae2fb0 2
+[Broken backtraces];0x503534;(anonymous namespace)::THPFunction_apply;$x;torch::autograd::SavedVariable::SavedVariable;torch::autograd::SavedVariable::get_default_hooks;$x 2
+[Broken backtraces];0x503534;pybind11::cpp_function::dispatcher;pybind11::cpp_function::initialize<>::{lambda()#1}::_FUN;cudnn_frontend::python_bindings::PyGraph::execute_with_raw_ptrs;cudnn_frontend::graph::Graph::execute_plan_at_index;cudnn_frontend::graph::Execution_plan_list::is_plan_index_executable;std::__cxx11::basic_string<>::_M_dispose 2
+[Broken backtraces];_PyEval_EvalFrameDefault;$x 2
+_PyObject_GenericGetAttrWithDict 2
+0x4cbd04 1
+0x4cc8f8 1
+0x4cd718 1
+0x4d087c 1
+0x4da3a0 1
+0x4f11bc 1
+0x4f11d0 1
+0x4f1200 1
+0x4f28f0 1
+0x4f4734 1
+0x4f491c 1
+0x4f542c 1
+0x4f67d8 1
+0x4f7ff0 1
+0x514f08 1
+0x5155d8 1
+0x51565c 1
+0x51db00 1
+0x522a34 1
+0x522c00 1
+0x524a88 1
+0x52e630 1
+0x52e650 1
+0x562600 1
+0x5866c0 1
+0x58981c 1
+0xfffff7fa084c 1
+PyDict_GetItemWithError 1
+PyErr_GetRaisedException 1
+PyMem_Malloc 1
+PyObject_GC_UnTrack 1
+PyObject_GetAttr 1
+PyObject_RichCompare 1
+PyObject_RichCompareBool 1
+PySequence_Fast 1
+PySequence_Tuple 1
+PyType_IsSubtype 1
+PyUnicode_Contains 1
+PyUnicode_InternInPlace 1
+[Broken backtraces];0x4cbd18;$x;c10::WarningUtils::set_warning_handler 1
+[Broken backtraces];0x4cbd18;$x;torch::PyWarningHandler::~PyWarningHandler;c10::WarningUtils::set_warning_handler 1
+[Broken backtraces];0x4cbd18;$x;torch::PythonArgs::toInt64;torch::get_symint_class 1
+[Broken backtraces];0x4cc49c;0xfffe4caed50c;0xfffe4caecde8;0xfffe4cab1c08;0xfffe4cab2aa8;0xfffe4c8cca90;0xfffe4c8de45c;0xfffe4c9bd760;0xfffe4cb0b6d4 1
+[Broken backtraces];0x4cc910;0x626b14 1
+[Broken backtraces];0x4cf984;0x5a50c0 1
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b6087c 1
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b6088c 1
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608a4;0xffff05a0538c;__clock_gettime 1
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608a4;0xffff05a0538c;__clock_gettime;0xfffff7fa0840 1
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608b4 1
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe3d0 1
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe3e0 1
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe3f8 1
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe420 1
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe424 1
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe428;0xffff05bbeea0 1
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe428;0xffff05bbeec0 1
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe428;0xffff05bbeed4 1
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe428;0xffff05bbeee4 1
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe428;0xffff05bbeee8 1
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe428;0xffff05bbef9c 1
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe428;0xffff05bbefb0 1
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe428;0xffff05bbefbc 1
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe428;0xffff05bbf07c 1
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe428;0xffff05bbf0a0 1
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe428;0xffff05bbf0a8 1
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe438 1
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe440 1
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe4b4;0xffff05bbfad4 1
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe4b4;0xffff05bbfae0 1
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe4b4;0xffff05bbfae4 1
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe4b4;0xffff05bbfb18 1
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe4b4;0xffff05bbfb20 1
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe4b4;0xffff05bbfb3c 1
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe4b4;0xffff05bbfb5c 1
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe4b4;0xffff05bbfb8c 1
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe4c8 1
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe54c 1
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe67c;0xffff05ae2d08 1
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe67c;0xffff05ae2d1c;0xffff05ae2e8c 1
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe67c;0xffff05ae2d1c;0xffff05ae2e98 1
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe67c;0xffff05ae2d1c;0xffff05ae2ed8 1
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe67c;0xffff05ae2d1c;0xffff05ae2ef4;0xffff05ad78bc 1
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe67c;0xffff05ae2d1c;0xffff05ae2ef4;0xffff05ad78cc 1
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe67c;0xffff05ae2d1c;0xffff05ae2ef4;0xffff05ad7954 1
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe67c;0xffff05ae2d1c;0xffff05ae2ef4;0xffff05ad7a68 1
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe67c;0xffff05ae2d1c;0xffff05ae2ef4;0xffff05ad7a78 1
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe67c;0xffff05ae2d1c;0xffff05ae2f14 1
+[Broken backtraces];0x503048;$x;c10::cuda::device_synchronize;cudaDeviceSynchronize;0xffffc7133e38;cuCtxSynchronize_v2;0xffff05a63014;0xffff05a72a68;0xffff05ade950;0xffff05adeaf0;0xffff05b608bc;0xffff05bbe67c;0xffff05ae2d1c;0xffff05ae3030 1
+[Broken backtraces];0x50332c;PyUFunc_GenericReduction;PyArray_Return;PyArray_Scalar 1
+[Broken backtraces];0x50332c;PyUFunc_GenericReduction;PyUFunc_ReduceWrapper;NpyIter_Deallocate;PyMem_RawFree 1
+[Broken backtraces];0x50332c;PyUFunc_GenericReduction;_npy_parse_arguments 1
+[Broken backtraces];0x50332c;PyUFunc_GenericReduction;reducelike_promote_and_resolve;PyArray_EquivTypes 1
+[Broken backtraces];0x503534;$x;$x;torch::autograd::Engine::execute;$x;torch::autograd::Engine::execute_with_graph_task;torch::autograd::Engine::thread_main;$x;std::condition_variable::wait 1
+[Broken backtraces];0x503534;$x;$x;torch::autograd::Engine::execute;torch::autograd::Engine::compute_dependencies;$x;$x;cuDevicePrimaryCtxGetState;0xffff05a655bc;0xffff05a018a0 1
+[Broken backtraces];0x503534;$x;$x;torch::autograd::Engine::execute;torch::autograd::Engine::compute_dependencies;$x;$x;cuDevicePrimaryCtxGetState;0xffff05a65668;0xfffe2c6b4dd8;0xfffe2c6b4be4;0xfffe2c6ba434;0xfffe2c6ba268;0xfffe2c6c30cc 1
+[Broken backtraces];0x503534;$x;$x;torch::autograd::Engine::execute;torch::autograd::Engine::compute_dependencies;$x;$x;cuDevicePrimaryCtxGetState;0xffff05a6567c;0xffff05a746b0 1
+[Broken backtraces];0x503534;$x;$x;torch::autograd::Engine::execute;torch::autograd::Engine::compute_dependencies;$x;at::accelerator::getAccelerator 1
+[Broken backtraces];0x503534;$x;PyEval_RestoreThread 1
+[Broken backtraces];0x503534;$x;at::_ops::empty_memory_format::call;$x;at::_ops::empty_memory_format::redispatch;$x;$x;$x;$x;c10::cuda::ExchangeDevice;cudaGetDevice;0xffffc7136148;cuCtxGetDevice_v2;0xffff05a63c44;0xfffe2c6b4dd8;0xfffe2c6b4be4;0xfffe2c6ba434;0xfffe2c6ba268;0xfffe2c6c3574 1
+[Broken backtraces];0x503534;$x;at::_ops::empty_memory_format::call;$x;at::_ops::empty_memory_format::redispatch;$x;$x;$x;$x;c10::cuda::ExchangeDevice;cudaGetDevice;0xffffc71361ec;0xffffc7168934 1
+[Broken backtraces];0x503534;$x;at::_ops::empty_memory_format::call;$x;at::_ops::empty_memory_format::redispatch;$x;$x;at::native::empty_cuda;at::detail::empty_cuda;at::detail::empty_cuda;$x;$x;c10::cuda::ExchangeDevice;cudaGetDevice 1
+[Broken backtraces];0x503534;$x;at::_ops::empty_memory_format::call;$x;at::_ops::empty_memory_format::redispatch;$x;$x;at::native::empty_cuda;at::detail::empty_cuda;at::detail::empty_cuda;$x;c10::cuda::MaybeSetDevice 1
+[Broken backtraces];0x503534;$x;at::_ops::empty_memory_format::call;$x;at::_ops::empty_memory_format::redispatch;$x;$x;at::native::empty_cuda;at::detail::empty_cuda;at::detail::empty_cuda;at::detail::empty_generic;$x 1
+[Broken backtraces];0x503534;$x;at::_ops::empty_memory_format::call;$x;at::_ops::empty_memory_format::redispatch;$x;$x;at::native::empty_cuda;at::detail::empty_cuda;at::detail::empty_cuda;at::detail::empty_generic;$x;$x;$x;c10::cuda::CUDACachingAllocator::Native::(anonymous namespace)::BlockPool::erase_from_blocks;std::_Rb_tree<>::erase 1
+[Broken backtraces];0x503534;$x;at::_ops::empty_memory_format::call;$x;at::_ops::empty_memory_format::redispatch;$x;$x;at::native::empty_cuda;at::detail::empty_cuda;at::detail::empty_cuda;at::detail::empty_generic;$x;$x;$x;c10::cuda::CUDACachingAllocator::Native::(anonymous namespace)::BlockPool::erase_from_blocks;std::_Rb_tree<>::erase;__libc_free 1
+[Broken backtraces];0x503534;$x;at::_ops::view::call;$x;$x;$x;$x;torch::autograd::impl::gradient_edge 1
+[Broken backtraces];0x503534;$x;at::_ops::view::call;$x;$x;at::_ops::view::redispatch;$x;$x;at::_ops::view::redispatch;$x;at::native::view;$x 1
+[Broken backtraces];0x503534;$x;at::_ops::view::call;at::getStepCallbacksUnlessEmpty;0xfffff7fc28e4 1
+[Broken backtraces];0x503534;$x;torch::autograd::impl::try_get_grad_accumulator;at::get_tensor_base 1
+[Broken backtraces];0x503534;(anonymous namespace)::THPFunction_apply 1
+[Broken backtraces];0x503534;(anonymous namespace)::THPFunction_apply;$x 1
+[Broken backtraces];0x503534;(anonymous namespace)::THPFunction_apply;$x;torch::autograd::SavedVariable::SavedVariable;at::TensorBase::tensor_data;$x;c10::TensorImpl::shallow_copy_and_detach;c10::TensorImpl::copy_tensor_metadata;$x 1
+[Broken backtraces];0x503534;(anonymous namespace)::THPFunction_apply;$x;torch::autograd::_wrap_outputs;$x;$x 1
+[Broken backtraces];0x503534;(anonymous namespace)::THPFunction_apply;$x;torch::autograd::_wrap_outputs;torch::autograd::InputMetadata::InputMetadata;torch::autograd::InputMetadata::InputMetadata;$x;c10::cuda::getCurrentCUDAStream;$x 1
+[Broken backtraces];0x503534;(anonymous namespace)::THPFunction_apply;torch::autograd::VariableInfo::VariableInfo;c10::TensorImpl::requires_grad 1
+[Broken backtraces];0x503534;pybind11::cpp_function::dispatcher;pybind11::cpp_function::initialize<>::{lambda()#1}::_FUN;cudnn_frontend::python_bindings::PyGraph::execute_with_raw_ptrs;cudnn_frontend::graph::Graph::execute_plan_at_index 1
+[Broken backtraces];0x50356c;0x6e7450 1
+[Broken backtraces];0x514f08;PyObject_GC_UnTrack 1
+[Broken backtraces];0x514f20;_PyThreadState_UncheckedGet 1
+[Broken backtraces];0x51db14;$x 1
+[Broken backtraces];0x523454;$x;c10::cuda::current_device;c10::cuda::GetDevice;cudaGetDevice;0xffffc714e87c;0xffffc71a921c;0xffffc71329e8 1
+[Broken backtraces];0x523834;$x;$x;c10::TensorImpl::~TensorImpl;c10::TensorImpl::~TensorImpl;$x;$x 1
+[Broken backtraces];0x58b9e4;NSYS_OSRT_pthread_cond_timedwait_0;0xffffe4aa9aac;0xffffe4c6c430 1
+[Broken backtraces];0x5a4020;0xffffe4bc28f0;0xffffe49e2d08;0xffffe49e2a70 1
+[Broken backtraces];0xffff05408e6c;cuLaunchKernelEx;0xffff05a15634;0xfffe2c6b4dd8;0xfffe2c6b4be4;0xfffe2c6ba434;0xfffe2c6ba268;0xfffe2c6c310c;0xfffe2c62cd28 1
+[Broken backtraces];0xffff05408e6c;cuLaunchKernelEx;0xffff05a15678;0xffff05a90460;0xffff05a90be0;0xffff05a91150;0xffff05b1d590;0xffff05b20b50 1
+[Broken backtraces];0xffff05408e6c;cuLaunchKernelEx;0xffff05a15678;0xffff05a90460;0xffff05a90be0;0xffff05a91150;0xffff05b1d9fc;0xfffe2c6b4dd8;0xfffe2c6b4be4;0xfffe2c6ba434;0xfffe2c6ba268;0xfffe2c6bf844;0xfffe2c632354;0xfffe2c6321d0;0xfffe2c61351c;0xfffe2c60aa84 1
+[Broken backtraces];0xffff05408e6c;cuLaunchKernelEx;0xffff05a15678;0xffff05a90460;0xffff05a90be0;0xffff05a91150;0xffff05b1e8f8;0xfffe2c6b4dd8;0xfffe2c6b4be4;0xfffe2c6ba434;0xfffe2c6ba268;0xfffe2c6bfce0;0xfffe2c635ec4 1
+[Broken backtraces];0xfffff7fa0850;0xfffff7fa0540 1
+[Broken backtraces];0xfffff7fa0850;0xfffff7fa0584 1
+[Broken backtraces];PyCapsule_GetPointer;0x420cc8 1
+[Broken backtraces];PyEval_SaveThread;NSYS_OSRT_pthread_cond_signal_1;0xffffe4a3d224;0xffffe4532028 1
+[Broken backtraces];PyEval_SaveThread;NSYS_OSRT_pthread_cond_signal_1;0xffffe4aa9984;0xffffe4c8a6f0 1
+[Broken backtraces];PyEval_SaveThread;NSYS_OSRT_pthread_cond_signal_1;pthread_cond_signal;0xffffe5910954 1
+[Broken backtraces];PyEval_SaveThread;NSYS_OSRT_pthread_cond_wait_1;pthread_cond_wait;0xffffe5851cc0 1
+[Broken backtraces];PyObject_Malloc;__libc_malloc;0xffffe5864f08 1
+[Broken backtraces];PyObject_Malloc;__libc_malloc;0xffffe5865340 1
+[Broken backtraces];PySet_Add;_Py_HashPointer 1
+[Broken backtraces];PyUnicode_RichCompare;0x420938 1
+[Broken backtraces];_PyEval_EvalFrameDefault;$x;$x;$x;c10::cuda::ExchangeDevice;cudaGetDevice;0xffff05c150b0;0xfffe2c6b4dd8;0xfffe2c6b4be4;0xfffe2c6ba434;0xfffe2c6ba268;0xfffe2c6c2e24 1
+[Broken backtraces];_PyEval_EvalFrameDefault;$x;$x;at::impl::ThreadLocalPythonObjects::set;$x;std::_Hash_bytes 1
+[Broken backtraces];_PyEval_EvalFrameDefault;$x;$x;at::indexing::impl::applySlice;at::_ops::slice_Tensor::call;$x;$x 1
+[Broken backtraces];_PyEval_EvalFrameDefault;$x;pybind11::cpp_function::initialize<>::{lambda()#1}::_FUN;0xffffe49e4fa4;0xffffe49e4e0c;0xffffe4c6c3b4;0xffffe4c84264 1
+[Broken backtraces];_PyEval_EvalFrameDefault;0x4f79d0 1
+[Broken backtraces];_PyEval_EvalFrameDefault;PyObject_Vectorcall;0x4cc420 1
+[Broken backtraces];_PyEval_EvalFrameDefault;_PyObject_GetMethod 1
+[Broken backtraces];_PyObject_GenericGetAttrWithDict;$x 1
+[Broken backtraces];_PyObject_GenericGetAttrWithDict;$x;at::impl::PythonTorchFunctionTLS::exchange_skip_next 1
+[Broken backtraces];_PyObject_GenericGetAttrWithDict;$x;torch::PyWarningHandler::PyWarningHandler;c10::WarningUtils::get_warning_handler 1
+[Broken backtraces];cudnn::backend::execute;0xfffefe1c82cc 1
+[Broken backtraces];cudnn::backend::execute;0xfffefe1c8380 1
+[Broken backtraces];cudnn::backend::execute;0xfffefe1e1dc8 1
+[Broken backtraces];cudnn::cnn::EngineInterface::execute;0xfff8e8c01184;0xfff8e8c01ba8;cuGetErrorString;0xffff05a691bc;0xfffe2c6b4dd8;0xfffe2c6b4be4;0xfffe2c6ba434;0xfffe2c6ba268;0xfffe2c6c2f94;0xfffe2c6278e8;__pthread_getspecific 1
+[Broken backtraces];cudnn::cnn::EngineInterface::execute;0xfff8e8c01204;0xfff8e8c015ec;0xfff8e8ce1838;0xffff05c14fc0 1
+[Broken backtraces];cudnnBackendSetAttribute;cudnnBackendSetAttribute 1
+[Broken backtraces];operator new;__libc_malloc 1
+[Broken backtraces];operator new;__libc_malloc;0xffffe58654dc 1
+[Broken backtraces];operator new;__libc_malloc;0xffffe5865630 1
+[Broken backtraces];std::__cxx11::basic_stringbuf<>::str;0xffffe5871ba0 1
+[Broken backtraces];std::__ostream_insert<>;0xffffc4290988 1
+[Broken backtraces];std::ios_base::_M_init;std::locale::operator= 1
+_PyDict_Contains_KnownHash 1
+_PyObject_Call_Prepend 1
+_PyObject_GC_New 1
+_PyObject_LookupSpecial 1
+_Py_Dealloc 1
+__dynamic_cast 1
+std::__ostream_insert<> 1
+std::locale::locale 1

@@ -1,0 +1,4151 @@
+<?xml version="1.0" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg version="1.1" width="1600" height="574" onload="init(evt)" viewBox="0 0 1600 574" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+<!-- Flame graph stack visualization. See https://github.com/brendangregg/FlameGraph for latest version, and http://www.brendangregg.com/flamegraphs.html for examples. -->
+<!-- NOTES:  -->
+<defs>
+	<linearGradient id="background" y1="0" y2="1" x1="0" x2="0" >
+		<stop stop-color="#eeeeee" offset="5%" />
+		<stop stop-color="#eeeeb0" offset="95%" />
+	</linearGradient>
+</defs>
+<style type="text/css">
+	text { font-family:Verdana; font-size:12px; fill:rgb(0,0,0); }
+	#search, #ignorecase { opacity:0.1; cursor:pointer; }
+	#search:hover, #search.show, #ignorecase:hover, #ignorecase.show { opacity:1; }
+	#subtitle { text-anchor:middle; font-color:rgb(160,160,160); }
+	#title { text-anchor:middle; font-size:17px}
+	#unzoom { cursor:pointer; }
+	#frames > *:hover { stroke:black; stroke-width:0.5; cursor:pointer; }
+	.hide { display:none; }
+	.parent { opacity:0.5; }
+</style>
+<script type="text/ecmascript">
+<![CDATA[
+	"use strict";
+	var details, searchbtn, unzoombtn, matchedtxt, svg, searching, currentSearchTerm, ignorecase, ignorecaseBtn;
+	function init(evt) {
+		details = document.getElementById("details").firstChild;
+		searchbtn = document.getElementById("search");
+		ignorecaseBtn = document.getElementById("ignorecase");
+		unzoombtn = document.getElementById("unzoom");
+		matchedtxt = document.getElementById("matched");
+		svg = document.getElementsByTagName("svg")[0];
+		searching = 0;
+		currentSearchTerm = null;
+
+		// use GET parameters to restore a flamegraphs state.
+		var params = get_params();
+		if (params.x && params.y)
+			zoom(find_group(document.querySelector('[x="' + params.x + '"][y="' + params.y + '"]')));
+                if (params.s) search(params.s);
+	}
+
+	// event listeners
+	window.addEventListener("click", function(e) {
+		var target = find_group(e.target);
+		if (target) {
+			if (target.nodeName == "a") {
+				if (e.ctrlKey === false) return;
+				e.preventDefault();
+			}
+			if (target.classList.contains("parent")) unzoom(true);
+			zoom(target);
+			if (!document.querySelector('.parent')) {
+				// we have basically done a clearzoom so clear the url
+				var params = get_params();
+				if (params.x) delete params.x;
+				if (params.y) delete params.y;
+				history.replaceState(null, null, parse_params(params));
+				unzoombtn.classList.add("hide");
+				return;
+			}
+
+			// set parameters for zoom state
+			var el = target.querySelector("rect");
+			if (el && el.attributes && el.attributes.y && el.attributes._orig_x) {
+				var params = get_params()
+				params.x = el.attributes._orig_x.value;
+				params.y = el.attributes.y.value;
+				history.replaceState(null, null, parse_params(params));
+			}
+		}
+		else if (e.target.id == "unzoom") clearzoom();
+		else if (e.target.id == "search") search_prompt();
+		else if (e.target.id == "ignorecase") toggle_ignorecase();
+	}, false)
+
+	// mouse-over for info
+	// show
+	window.addEventListener("mouseover", function(e) {
+		var target = find_group(e.target);
+		if (target) details.nodeValue = "Function: " + g_to_text(target);
+	}, false)
+
+	// clear
+	window.addEventListener("mouseout", function(e) {
+		var target = find_group(e.target);
+		if (target) details.nodeValue = ' ';
+	}, false)
+
+	// ctrl-F for search
+	// ctrl-I to toggle case-sensitive search
+	window.addEventListener("keydown",function (e) {
+		if (e.keyCode === 114 || (e.ctrlKey && e.keyCode === 70)) {
+			e.preventDefault();
+			search_prompt();
+		}
+		else if (e.ctrlKey && e.keyCode === 73) {
+			e.preventDefault();
+			toggle_ignorecase();
+		}
+	}, false)
+
+	// functions
+	function get_params() {
+		var params = {};
+		var paramsarr = window.location.search.substr(1).split('&');
+		for (var i = 0; i < paramsarr.length; ++i) {
+			var tmp = paramsarr[i].split("=");
+			if (!tmp[0] || !tmp[1]) continue;
+			params[tmp[0]]  = decodeURIComponent(tmp[1]);
+		}
+		return params;
+	}
+	function parse_params(params) {
+		var uri = "?";
+		for (var key in params) {
+			uri += key + '=' + encodeURIComponent(params[key]) + '&';
+		}
+		if (uri.slice(-1) == "&")
+			uri = uri.substring(0, uri.length - 1);
+		if (uri == '?')
+			uri = window.location.href.split('?')[0];
+		return uri;
+	}
+	function find_child(node, selector) {
+		var children = node.querySelectorAll(selector);
+		if (children.length) return children[0];
+	}
+	function find_group(node) {
+		var parent = node.parentElement;
+		if (!parent) return;
+		if (parent.id == "frames") return node;
+		return find_group(parent);
+	}
+	function orig_save(e, attr, val) {
+		if (e.attributes["_orig_" + attr] != undefined) return;
+		if (e.attributes[attr] == undefined) return;
+		if (val == undefined) val = e.attributes[attr].value;
+		e.setAttribute("_orig_" + attr, val);
+	}
+	function orig_load(e, attr) {
+		if (e.attributes["_orig_"+attr] == undefined) return;
+		e.attributes[attr].value = e.attributes["_orig_" + attr].value;
+		e.removeAttribute("_orig_"+attr);
+	}
+	function g_to_text(e) {
+		var text = find_child(e, "title").firstChild.nodeValue;
+		return (text)
+	}
+	function g_to_func(e) {
+		var func = g_to_text(e);
+		// if there's any manipulation we want to do to the function
+		// name before it's searched, do it here before returning.
+		return (func);
+	}
+	function update_text(e) {
+		var r = find_child(e, "rect");
+		var t = find_child(e, "text");
+		var w = parseFloat(r.attributes.width.value) -3;
+		var txt = find_child(e, "title").textContent.replace(/\([^(]*\)$/,"");
+		t.attributes.x.value = parseFloat(r.attributes.x.value) + 3;
+
+		// Smaller than this size won't fit anything
+		if (w < 2 * 12 * 0.59) {
+			t.textContent = "";
+			return;
+		}
+
+		t.textContent = txt;
+		var sl = t.getSubStringLength(0, txt.length);
+		// check if only whitespace or if we can fit the entire string into width w
+		if (/^ *$/.test(txt) || sl < w)
+			return;
+
+		// this isn't perfect, but gives a good starting point
+		// and avoids calling getSubStringLength too often
+		var start = Math.floor((w/sl) * txt.length);
+		for (var x = start; x > 0; x = x-2) {
+			if (t.getSubStringLength(0, x + 2) <= w) {
+				t.textContent = txt.substring(0, x) + "..";
+				return;
+			}
+		}
+		t.textContent = "";
+	}
+
+	// zoom
+	function zoom_reset(e) {
+		if (e.attributes != undefined) {
+			orig_load(e, "x");
+			orig_load(e, "width");
+		}
+		if (e.childNodes == undefined) return;
+		for (var i = 0, c = e.childNodes; i < c.length; i++) {
+			zoom_reset(c[i]);
+		}
+	}
+	function zoom_child(e, x, ratio) {
+		if (e.attributes != undefined) {
+			if (e.attributes.x != undefined) {
+				orig_save(e, "x");
+				e.attributes.x.value = (parseFloat(e.attributes.x.value) - x - 10) * ratio + 10;
+				if (e.tagName == "text")
+					e.attributes.x.value = find_child(e.parentNode, "rect[x]").attributes.x.value + 3;
+			}
+			if (e.attributes.width != undefined) {
+				orig_save(e, "width");
+				e.attributes.width.value = parseFloat(e.attributes.width.value) * ratio;
+			}
+		}
+
+		if (e.childNodes == undefined) return;
+		for (var i = 0, c = e.childNodes; i < c.length; i++) {
+			zoom_child(c[i], x - 10, ratio);
+		}
+	}
+	function zoom_parent(e) {
+		if (e.attributes) {
+			if (e.attributes.x != undefined) {
+				orig_save(e, "x");
+				e.attributes.x.value = 10;
+			}
+			if (e.attributes.width != undefined) {
+				orig_save(e, "width");
+				e.attributes.width.value = parseInt(svg.width.baseVal.value) - (10 * 2);
+			}
+		}
+		if (e.childNodes == undefined) return;
+		for (var i = 0, c = e.childNodes; i < c.length; i++) {
+			zoom_parent(c[i]);
+		}
+	}
+	function zoom(node) {
+		var attr = find_child(node, "rect").attributes;
+		var width = parseFloat(attr.width.value);
+		var xmin = parseFloat(attr.x.value);
+		var xmax = parseFloat(xmin + width);
+		var ymin = parseFloat(attr.y.value);
+		var ratio = (svg.width.baseVal.value - 2 * 10) / width;
+
+		// XXX: Workaround for JavaScript float issues (fix me)
+		var fudge = 0.0001;
+
+		unzoombtn.classList.remove("hide");
+
+		var el = document.getElementById("frames").children;
+		for (var i = 0; i < el.length; i++) {
+			var e = el[i];
+			var a = find_child(e, "rect").attributes;
+			var ex = parseFloat(a.x.value);
+			var ew = parseFloat(a.width.value);
+			var upstack;
+			// Is it an ancestor
+			if (0 == 0) {
+				upstack = parseFloat(a.y.value) > ymin;
+			} else {
+				upstack = parseFloat(a.y.value) < ymin;
+			}
+			if (upstack) {
+				// Direct ancestor
+				if (ex <= xmin && (ex+ew+fudge) >= xmax) {
+					e.classList.add("parent");
+					zoom_parent(e);
+					update_text(e);
+				}
+				// not in current path
+				else
+					e.classList.add("hide");
+			}
+			// Children maybe
+			else {
+				// no common path
+				if (ex < xmin || ex + fudge >= xmax) {
+					e.classList.add("hide");
+				}
+				else {
+					zoom_child(e, xmin, ratio);
+					update_text(e);
+				}
+			}
+		}
+		search();
+	}
+	function unzoom(dont_update_text) {
+		unzoombtn.classList.add("hide");
+		var el = document.getElementById("frames").children;
+		for(var i = 0; i < el.length; i++) {
+			el[i].classList.remove("parent");
+			el[i].classList.remove("hide");
+			zoom_reset(el[i]);
+			if(!dont_update_text) update_text(el[i]);
+		}
+		search();
+	}
+	function clearzoom() {
+		unzoom();
+
+		// remove zoom state
+		var params = get_params();
+		if (params.x) delete params.x;
+		if (params.y) delete params.y;
+		history.replaceState(null, null, parse_params(params));
+	}
+
+	// search
+	function toggle_ignorecase() {
+		ignorecase = !ignorecase;
+		if (ignorecase) {
+			ignorecaseBtn.classList.add("show");
+		} else {
+			ignorecaseBtn.classList.remove("show");
+		}
+		reset_search();
+		search();
+	}
+	function reset_search() {
+		var el = document.querySelectorAll("#frames rect");
+		for (var i = 0; i < el.length; i++) {
+			orig_load(el[i], "fill")
+		}
+		var params = get_params();
+		delete params.s;
+		history.replaceState(null, null, parse_params(params));
+	}
+	function search_prompt() {
+		if (!searching) {
+			var term = prompt("Enter a search term (regexp " +
+			    "allowed, eg: ^ext4_)"
+			    + (ignorecase ? ", ignoring case" : "")
+			    + "\nPress Ctrl-i to toggle case sensitivity", "");
+			if (term != null) search(term);
+		} else {
+			reset_search();
+			searching = 0;
+			currentSearchTerm = null;
+			searchbtn.classList.remove("show");
+			searchbtn.firstChild.nodeValue = "Search"
+			matchedtxt.classList.add("hide");
+			matchedtxt.firstChild.nodeValue = ""
+		}
+	}
+	function search(term) {
+		if (term) currentSearchTerm = term;
+		if (currentSearchTerm === null) return;
+
+		var re = new RegExp(currentSearchTerm, ignorecase ? 'i' : '');
+		var el = document.getElementById("frames").children;
+		var matches = new Object();
+		var maxwidth = 0;
+		for (var i = 0; i < el.length; i++) {
+			var e = el[i];
+			var func = g_to_func(e);
+			var rect = find_child(e, "rect");
+			if (func == null || rect == null)
+				continue;
+
+			// Save max width. Only works as we have a root frame
+			var w = parseFloat(rect.attributes.width.value);
+			if (w > maxwidth)
+				maxwidth = w;
+
+			if (func.match(re)) {
+				// highlight
+				var x = parseFloat(rect.attributes.x.value);
+				orig_save(rect, "fill");
+				rect.attributes.fill.value = "rgb(230,0,230)";
+
+				// remember matches
+				if (matches[x] == undefined) {
+					matches[x] = w;
+				} else {
+					if (w > matches[x]) {
+						// overwrite with parent
+						matches[x] = w;
+					}
+				}
+				searching = 1;
+			}
+		}
+		if (!searching)
+			return;
+		var params = get_params();
+		params.s = currentSearchTerm;
+		history.replaceState(null, null, parse_params(params));
+
+		searchbtn.classList.add("show");
+		searchbtn.firstChild.nodeValue = "Reset Search";
+
+		// calculate percent matched, excluding vertical overlap
+		var count = 0;
+		var lastx = -1;
+		var lastw = 0;
+		var keys = Array();
+		for (k in matches) {
+			if (matches.hasOwnProperty(k))
+				keys.push(k);
+		}
+		// sort the matched frames by their x location
+		// ascending, then width descending
+		keys.sort(function(a, b){
+			return a - b;
+		});
+		// Step through frames saving only the biggest bottom-up frames
+		// thanks to the sort order. This relies on the tree property
+		// where children are always smaller than their parents.
+		var fudge = 0.0001;	// JavaScript floating point
+		for (var k in keys) {
+			var x = parseFloat(keys[k]);
+			var w = matches[keys[k]];
+			if (x >= lastx + lastw - fudge) {
+				count += w;
+				lastx = x;
+				lastw = w;
+			}
+		}
+		// display matched percent
+		matchedtxt.classList.remove("hide");
+		var pct = 100 * count / maxwidth;
+		if (pct != 100) pct = pct.toFixed(1)
+		matchedtxt.firstChild.nodeValue = "Matched: " + pct + "%";
+	}
+]]>
+</script>
+<rect x="0.0" y="0" width="1600.0" height="574.0" fill="url(#background)"  />
+<text id="title" x="800.00" y="24" >C++ / large - native CPU (full)</text>
+<text id="subtitle" x="800.00" y="48" >1413 samples; all captured process threads; complete measured NVTX window</text>
+<text id="details" x="10.00" y="557" > </text>
+<text id="unzoom" x="10.00" y="24" class="hide">Reset Zoom</text>
+<text id="search" x="1490.00" y="24" >Search</text>
+<text id="ignorecase" x="1574.00" y="24" >ic</text>
+<text id="matched" x="1490.00" y="557" > </text>
+<g id="frames">
+<g >
+<title>cudaGetDevice (1 samples, 0.07%)</title><rect x="1121.5" y="301" width="1.1" height="15.0" fill="rgb(246,109,46)" rx="2" ry="2" />
+<text  x="1124.48" y="311.5" ></text>
+</g>
+<g >
+<title>__pthread_getspecific (1 samples, 0.07%)</title><rect x="1444.6" y="365" width="1.2" height="15.0" fill="rgb(228,141,25)" rx="2" ry="2" />
+<text  x="1447.64" y="375.5" ></text>
+</g>
+<g >
+<title>0xfff8e8c00308 (3 samples, 0.21%)</title><rect x="1566.5" y="461" width="3.4" height="15.0" fill="rgb(238,96,36)" rx="2" ry="2" />
+<text  x="1569.52" y="471.5" ></text>
+</g>
+<g >
+<title>0xffffc71761d0 (1 samples, 0.07%)</title><rect x="1526.3" y="173" width="1.1" height="15.0" fill="rgb(239,96,37)" rx="2" ry="2" />
+<text  x="1529.26" y="183.5" ></text>
+</g>
+<g >
+<title>0xfff8e8c056fc (1 samples, 0.07%)</title><rect x="1574.3" y="461" width="1.2" height="15.0" fill="rgb(231,96,29)" rx="2" ry="2" />
+<text  x="1577.35" y="471.5" ></text>
+</g>
+<g >
+<title>__libc_free (1 samples, 0.07%)</title><rect x="1508.4" y="365" width="1.1" height="15.0" fill="rgb(246,154,46)" rx="2" ry="2" />
+<text  x="1511.37" y="375.5" ></text>
+</g>
+<g >
+<title>PyObject_IsInstance (1 samples, 0.07%)</title><rect x="1559.8" y="477" width="1.1" height="15.0" fill="rgb(251,207,51)" rx="2" ry="2" />
+<text  x="1562.81" y="487.5" ></text>
+</g>
+<g >
+<title>torch::autograd::InputBuffer::add (1 samples, 0.07%)</title><rect x="1558.7" y="397" width="1.1" height="15.0" fill="rgb(253,157,53)" rx="2" ry="2" />
+<text  x="1561.69" y="407.5" ></text>
+</g>
+<g >
+<title>$x (1 samples, 0.07%)</title><rect x="1557.6" y="365" width="1.1" height="15.0" fill="rgb(251,113,50)" rx="2" ry="2" />
+<text  x="1560.57" y="375.5" ></text>
+</g>
+<g >
+<title>0xffff05ae2fb4 (1 samples, 0.07%)</title><rect x="1100.2" y="269" width="1.2" height="15.0" fill="rgb(236,96,34)" rx="2" ry="2" />
+<text  x="1103.23" y="279.5" ></text>
+</g>
+<g >
+<title>0xfffe546b4be4 (1 samples, 0.07%)</title><rect x="1581.1" y="253" width="1.1" height="15.0" fill="rgb(247,96,47)" rx="2" ry="2" />
+<text  x="1584.05" y="263.5" ></text>
+</g>
+<g >
+<title>cuCtxGetCurrent (1 samples, 0.07%)</title><rect x="1518.4" y="349" width="1.2" height="15.0" fill="rgb(241,100,39)" rx="2" ry="2" />
+<text  x="1521.44" y="359.5" ></text>
+</g>
+<g >
+<title>0xffff05ae2ef4 (767 samples, 54.28%)</title><rect x="241.5" y="269" width="857.6" height="15.0" fill="rgb(244,96,43)" rx="2" ry="2" />
+<text  x="244.46" y="279.5" >0xffff05ae2ef4</text>
+</g>
+<g >
+<title>0xffff05ad791c (20 samples, 1.42%)</title><rect x="373.4" y="253" width="22.4" height="15.0" fill="rgb(227,96,24)" rx="2" ry="2" />
+<text  x="376.41" y="263.5" >0..</text>
+</g>
+<g >
+<title>0xffff05ad7970 (32 samples, 2.26%)</title><rect x="1011.9" y="253" width="35.8" height="15.0" fill="rgb(234,96,32)" rx="2" ry="2" />
+<text  x="1014.90" y="263.5" >0xf..</text>
+</g>
+<g >
+<title>0xffffe58bba0c (3 samples, 0.21%)</title><rect x="21.2" y="477" width="3.3" height="15.0" fill="rgb(234,96,32)" rx="2" ry="2" />
+<text  x="24.18" y="487.5" ></text>
+</g>
+<g >
+<title>0xfff8e8c01b18 (1 samples, 0.07%)</title><rect x="1574.3" y="445" width="1.2" height="15.0" fill="rgb(237,96,35)" rx="2" ry="2" />
+<text  x="1577.35" y="455.5" ></text>
+</g>
+<g >
+<title>transformer_engine::cuda::current_device (3 samples, 0.21%)</title><rect x="1515.1" y="365" width="3.3" height="15.0" fill="rgb(246,158,46)" rx="2" ry="2" />
+<text  x="1518.08" y="375.5" ></text>
+</g>
+<g >
+<title>0xfffe546b4be4 (1 samples, 0.07%)</title><rect x="1129.3" y="141" width="1.1" height="15.0" fill="rgb(247,96,47)" rx="2" ry="2" />
+<text  x="1132.31" y="151.5" ></text>
+</g>
+<g >
+<title>0xffffc71a5fd8 (1 samples, 0.07%)</title><rect x="1435.7" y="381" width="1.1" height="15.0" fill="rgb(239,96,37)" rx="2" ry="2" />
+<text  x="1438.69" y="391.5" ></text>
+</g>
+<g >
+<title>0x4f86f8 (1 samples, 0.07%)</title><rect x="42.4" y="493" width="1.1" height="15.0" fill="rgb(237,102,35)" rx="2" ry="2" />
+<text  x="45.43" y="503.5" ></text>
+</g>
+<g >
+<title>0xffffe4aa97cc (1 samples, 0.07%)</title><rect x="1461.4" y="445" width="1.1" height="15.0" fill="rgb(234,96,32)" rx="2" ry="2" />
+<text  x="1464.41" y="455.5" ></text>
+</g>
+<g >
+<title>0xffff05bbeed0 (1 samples, 0.07%)</title><rect x="111.8" y="285" width="1.1" height="15.0" fill="rgb(236,96,34)" rx="2" ry="2" />
+<text  x="114.76" y="295.5" ></text>
+</g>
+<g >
+<title>$x (1 samples, 0.07%)</title><rect x="1439.0" y="205" width="1.2" height="15.0" fill="rgb(251,113,50)" rx="2" ry="2" />
+<text  x="1442.04" y="215.5" ></text>
+</g>
+<g >
+<title>transformer_engine::fused_attn::get_graph&lt;&gt; (1 samples, 0.07%)</title><rect x="1581.1" y="381" width="1.1" height="15.0" fill="rgb(240,158,38)" rx="2" ry="2" />
+<text  x="1584.05" y="391.5" ></text>
+</g>
+<g >
+<title>0xffffe585582c (3 samples, 0.21%)</title><rect x="24.5" y="461" width="3.4" height="15.0" fill="rgb(227,96,24)" rx="2" ry="2" />
+<text  x="27.54" y="471.5" ></text>
+</g>
+<g >
+<title>0x58be38 (1 samples, 0.07%)</title><rect x="1158.4" y="477" width="1.1" height="15.0" fill="rgb(233,99,31)" rx="2" ry="2" />
+<text  x="1161.38" y="487.5" ></text>
+</g>
+<g >
+<title>cuLaunchKernelEx (6 samples, 0.42%)</title><rect x="1537.4" y="461" width="6.8" height="15.0" fill="rgb(251,109,51)" rx="2" ry="2" />
+<text  x="1540.45" y="471.5" ></text>
+</g>
+<g >
+<title>at::empty (1 samples, 0.07%)</title><rect x="1126.0" y="381" width="1.1" height="15.0" fill="rgb(243,111,42)" rx="2" ry="2" />
+<text  x="1128.95" y="391.5" ></text>
+</g>
+<g >
+<title>transformer_engine::pytorch::NoneQuantizer::create_tensor (1 samples, 0.07%)</title><rect x="1531.9" y="365" width="1.1" height="15.0" fill="rgb(242,158,40)" rx="2" ry="2" />
+<text  x="1534.85" y="375.5" ></text>
+</g>
+<g >
+<title>0xffff05a90460 (3 samples, 0.21%)</title><rect x="1160.6" y="429" width="3.4" height="15.0" fill="rgb(227,96,24)" rx="2" ry="2" />
+<text  x="1163.62" y="439.5" ></text>
+</g>
+<g >
+<title>nvte_create_tensor (1 samples, 0.07%)</title><rect x="1529.6" y="381" width="1.1" height="15.0" fill="rgb(242,163,40)" rx="2" ry="2" />
+<text  x="1532.62" y="391.5" ></text>
+</g>
+<g >
+<title>0xffff05a0538c (3 samples, 0.21%)</title><rect x="83.8" y="301" width="3.4" height="15.0" fill="rgb(236,96,34)" rx="2" ry="2" />
+<text  x="86.80" y="311.5" ></text>
+</g>
+<g >
+<title>0xffff05bbe684 (1 samples, 0.07%)</title><rect x="1102.5" y="301" width="1.1" height="15.0" fill="rgb(246,96,45)" rx="2" ry="2" />
+<text  x="1105.47" y="311.5" ></text>
+</g>
+<g >
+<title>0x4cc49c (4 samples, 0.28%)</title><rect x="78.2" y="477" width="4.5" height="15.0" fill="rgb(234,102,32)" rx="2" ry="2" />
+<text  x="81.21" y="487.5" ></text>
+</g>
+<g >
+<title>0xffffe4f16a54 (1 samples, 0.07%)</title><rect x="1158.4" y="397" width="1.1" height="15.0" fill="rgb(240,96,39)" rx="2" ry="2" />
+<text  x="1161.38" y="407.5" ></text>
+</g>
+<g >
+<title>0xffffe585a4c4 (1 samples, 0.07%)</title><rect x="24.5" y="333" width="1.2" height="15.0" fill="rgb(248,96,48)" rx="2" ry="2" />
+<text  x="27.54" y="343.5" ></text>
+</g>
+<g >
+<title>0xffff05ad7928 (5 samples, 0.35%)</title><rect x="480.8" y="253" width="5.5" height="15.0" fill="rgb(231,96,29)" rx="2" ry="2" />
+<text  x="483.76" y="263.5" ></text>
+</g>
+<g >
+<title>at::empty (4 samples, 0.28%)</title><rect x="1522.9" y="381" width="4.5" height="15.0" fill="rgb(243,111,42)" rx="2" ry="2" />
+<text  x="1525.91" y="391.5" ></text>
+</g>
+<g >
+<title>0xffffc7173e38 (914 samples, 64.69%)</title><rect x="82.7" y="413" width="1022.0" height="15.0" fill="rgb(233,96,31)" rx="2" ry="2" />
+<text  x="85.68" y="423.5" >0xffffc7173e38</text>
+</g>
+<g >
+<title>0xfffe546b4dd8 (1 samples, 0.07%)</title><rect x="1139.4" y="269" width="1.1" height="15.0" fill="rgb(240,96,39)" rx="2" ry="2" />
+<text  x="1142.37" y="279.5" ></text>
+</g>
+<g >
+<title>0xffff05ad7900 (6 samples, 0.42%)</title><rect x="324.2" y="253" width="6.7" height="15.0" fill="rgb(230,96,27)" rx="2" ry="2" />
+<text  x="327.21" y="263.5" ></text>
+</g>
+<g >
+<title>0xffff05ad78b4 (2 samples, 0.14%)</title><rect x="242.6" y="253" width="2.2" height="15.0" fill="rgb(234,96,32)" rx="2" ry="2" />
+<text  x="245.58" y="263.5" ></text>
+</g>
+<g >
+<title>0xffffe4c93e2c (1 samples, 0.07%)</title><rect x="1583.3" y="429" width="1.1" height="15.0" fill="rgb(229,96,26)" rx="2" ry="2" />
+<text  x="1586.29" y="439.5" ></text>
+</g>
+<g >
+<title>transformer_engine::pytorch::fused_attn_bwd (22 samples, 1.56%)</title><rect x="1508.4" y="413" width="24.6" height="15.0" fill="rgb(243,158,42)" rx="2" ry="2" />
+<text  x="1511.37" y="423.5" >t..</text>
+</g>
+<g >
+<title>c10::cuda::GetDevice (1 samples, 0.07%)</title><rect x="1522.9" y="253" width="1.1" height="15.0" fill="rgb(246,132,46)" rx="2" ry="2" />
+<text  x="1525.91" y="263.5" ></text>
+</g>
+<g >
+<title>0xffff05bbf08c (1 samples, 0.07%)</title><rect x="127.4" y="285" width="1.1" height="15.0" fill="rgb(238,96,36)" rx="2" ry="2" />
+<text  x="130.41" y="295.5" ></text>
+</g>
+<g >
+<title>0x4fea98 (1 samples, 0.07%)</title><rect x="44.7" y="493" width="1.1" height="15.0" fill="rgb(241,102,40)" rx="2" ry="2" />
+<text  x="47.66" y="503.5" ></text>
+</g>
+<g >
+<title>at::RecordFunction::currentThreadId (1 samples, 0.07%)</title><rect x="1552.0" y="349" width="1.1" height="15.0" fill="rgb(244,111,43)" rx="2" ry="2" />
+<text  x="1554.98" y="359.5" ></text>
+</g>
+<g >
+<title>0xfffe5462de3c (1 samples, 0.07%)</title><rect x="1545.3" y="253" width="1.1" height="15.0" fill="rgb(228,96,25)" rx="2" ry="2" />
+<text  x="1548.27" y="263.5" ></text>
+</g>
+<g >
+<title>0xffffc7176148 (1 samples, 0.07%)</title><rect x="1581.1" y="317" width="1.1" height="15.0" fill="rgb(235,96,33)" rx="2" ry="2" />
+<text  x="1584.05" y="327.5" ></text>
+</g>
+<g >
+<title>0xffff05bbe4b8 (2 samples, 0.14%)</title><rect x="226.9" y="301" width="2.3" height="15.0" fill="rgb(230,96,28)" rx="2" ry="2" />
+<text  x="229.93" y="311.5" ></text>
+</g>
+<g >
+<title>at::detail::empty_cuda (2 samples, 0.14%)</title><rect x="1129.3" y="269" width="2.2" height="15.0" fill="rgb(235,111,33)" rx="2" ry="2" />
+<text  x="1132.31" y="279.5" ></text>
+</g>
+<g >
+<title>at::_ops::empty_memory_format::redispatch (2 samples, 0.14%)</title><rect x="1527.4" y="333" width="2.2" height="15.0" fill="rgb(242,111,41)" rx="2" ry="2" />
+<text  x="1530.38" y="343.5" ></text>
+</g>
+<g >
+<title>__pthread_getspecific (1 samples, 0.07%)</title><rect x="1555.3" y="189" width="1.2" height="15.0" fill="rgb(228,141,25)" rx="2" ry="2" />
+<text  x="1558.34" y="199.5" ></text>
+</g>
+<g >
+<title>0x4f513c (1 samples, 0.07%)</title><rect x="39.1" y="493" width="1.1" height="15.0" fill="rgb(230,102,28)" rx="2" ry="2" />
+<text  x="42.07" y="503.5" ></text>
+</g>
+<g >
+<title>at::ThreadLocalState::ThreadLocalState (1 samples, 0.07%)</title><rect x="1550.9" y="413" width="1.1" height="15.0" fill="rgb(245,111,45)" rx="2" ry="2" />
+<text  x="1553.86" y="423.5" ></text>
+</g>
+<g >
+<title>PySequence_Tuple (1 samples, 0.07%)</title><rect x="1449.1" y="461" width="1.1" height="15.0" fill="rgb(240,194,39)" rx="2" ry="2" />
+<text  x="1452.11" y="471.5" ></text>
+</g>
+<g >
+<title>PyLong_FromLongLong (1 samples, 0.07%)</title><rect x="1424.5" y="477" width="1.1" height="15.0" fill="rgb(247,217,46)" rx="2" ry="2" />
+<text  x="1427.51" y="487.5" ></text>
+</g>
+<g >
+<title>0xffffe4c6dc58 (1 samples, 0.07%)</title><rect x="26.8" y="333" width="1.1" height="15.0" fill="rgb(232,96,30)" rx="2" ry="2" />
+<text  x="29.77" y="343.5" ></text>
+</g>
+<g >
+<title>PyObject_RichCompareBool (1 samples, 0.07%)</title><rect x="72.6" y="493" width="1.1" height="15.0" fill="rgb(237,207,36)" rx="2" ry="2" />
+<text  x="75.62" y="503.5" ></text>
+</g>
+<g >
+<title>0xffffe49e3c24 (2 samples, 0.14%)</title><rect x="1443.5" y="429" width="2.3" height="15.0" fill="rgb(242,96,41)" rx="2" ry="2" />
+<text  x="1446.52" y="439.5" ></text>
+</g>
+<g >
+<title>transformer_engine::cuda::current_device (1 samples, 0.07%)</title><rect x="1121.5" y="317" width="1.1" height="15.0" fill="rgb(246,158,46)" rx="2" ry="2" />
+<text  x="1124.48" y="327.5" ></text>
+</g>
+<g >
+<title>0xfffe546ba434 (1 samples, 0.07%)</title><rect x="1139.4" y="237" width="1.1" height="15.0" fill="rgb(241,96,39)" rx="2" ry="2" />
+<text  x="1142.37" y="247.5" ></text>
+</g>
+<g >
+<title>[Broken backtraces] (1,238 samples, 87.62%)</title><rect x="78.2" y="493" width="1384.3" height="15.0" fill="rgb(240,202,39)" rx="2" ry="2" />
+<text  x="81.21" y="503.5" >[Broken backtraces]</text>
+</g>
+<g >
+<title>0xfffe546ba268 (1 samples, 0.07%)</title><rect x="1546.4" y="253" width="1.1" height="15.0" fill="rgb(232,96,29)" rx="2" ry="2" />
+<text  x="1549.39" y="263.5" ></text>
+</g>
+<g >
+<title>0xffffe4bc2918 (1 samples, 0.07%)</title><rect x="1159.5" y="461" width="1.1" height="15.0" fill="rgb(232,96,30)" rx="2" ry="2" />
+<text  x="1162.50" y="471.5" ></text>
+</g>
+<g >
+<title>_init (1 samples, 0.07%)</title><rect x="1124.8" y="381" width="1.2" height="15.0" fill="rgb(236,153,34)" rx="2" ry="2" />
+<text  x="1127.83" y="391.5" ></text>
+</g>
+<g >
+<title>cudaGetDevice (1 samples, 0.07%)</title><rect x="1128.2" y="253" width="1.1" height="15.0" fill="rgb(246,109,46)" rx="2" ry="2" />
+<text  x="1131.19" y="263.5" ></text>
+</g>
+<g >
+<title>0xffff05bbe488 (1 samples, 0.07%)</title><rect x="173.3" y="301" width="1.1" height="15.0" fill="rgb(240,96,39)" rx="2" ry="2" />
+<text  x="176.26" y="311.5" ></text>
+</g>
+<g >
+<title>0xffff05ad7a78 (1 samples, 0.07%)</title><rect x="1094.6" y="253" width="1.2" height="15.0" fill="rgb(243,96,42)" rx="2" ry="2" />
+<text  x="1097.64" y="263.5" ></text>
+</g>
+<g >
+<title>c10::cuda::CUDACachingAllocator::Native::(anonymous namespace)::BlockPool::erase_from_blocks (1 samples, 0.07%)</title><rect x="1136.0" y="157" width="1.1" height="15.0" fill="rgb(235,132,33)" rx="2" ry="2" />
+<text  x="1139.02" y="167.5" ></text>
+</g>
+<g >
+<title>0xffff05ad7954 (5 samples, 0.35%)</title><rect x="523.2" y="253" width="5.6" height="15.0" fill="rgb(235,96,33)" rx="2" ry="2" />
+<text  x="526.25" y="263.5" ></text>
+</g>
+<g >
+<title>0xfffe546b4be4 (1 samples, 0.07%)</title><rect x="1572.1" y="365" width="1.1" height="15.0" fill="rgb(247,96,47)" rx="2" ry="2" />
+<text  x="1575.11" y="375.5" ></text>
+</g>
+<g >
+<title>0xfffe546b4be4 (2 samples, 0.14%)</title><rect x="1540.8" y="349" width="2.2" height="15.0" fill="rgb(247,96,47)" rx="2" ry="2" />
+<text  x="1543.80" y="359.5" ></text>
+</g>
+<g >
+<title>transformer_engine::detail::HandleManager&lt;&gt;::GetHandle (1 samples, 0.07%)</title><rect x="1114.8" y="381" width="1.1" height="15.0" fill="rgb(240,158,39)" rx="2" ry="2" />
+<text  x="1117.77" y="391.5" ></text>
+</g>
+<g >
+<title>0xfff8e8c01204 (1 samples, 0.07%)</title><rect x="1458.1" y="461" width="1.1" height="15.0" fill="rgb(245,96,44)" rx="2" ry="2" />
+<text  x="1461.05" y="471.5" ></text>
+</g>
+<g >
+<title>0xffffe5864df8 (1 samples, 0.07%)</title><rect x="1460.3" y="445" width="1.1" height="15.0" fill="rgb(238,96,36)" rx="2" ry="2" />
+<text  x="1463.29" y="455.5" ></text>
+</g>
+<g >
+<title>$x (1 samples, 0.07%)</title><rect x="1153.9" y="349" width="1.1" height="15.0" fill="rgb(251,113,50)" rx="2" ry="2" />
+<text  x="1156.91" y="359.5" ></text>
+</g>
+<g >
+<title>pybind11::cpp_function::initialize&lt;&gt;::{lambda()#1}::operator() (1 samples, 0.07%)</title><rect x="1581.1" y="477" width="1.1" height="15.0" fill="rgb(241,207,40)" rx="2" ry="2" />
+<text  x="1584.05" y="487.5" ></text>
+</g>
+<g >
+<title>$x (3 samples, 0.21%)</title><rect x="1128.2" y="301" width="3.3" height="15.0" fill="rgb(251,113,50)" rx="2" ry="2" />
+<text  x="1131.19" y="311.5" ></text>
+</g>
+<g >
+<title>transformer_engine::fused_attn::FusedAttnConfig::derive (2 samples, 0.14%)</title><rect x="1115.9" y="381" width="2.2" height="15.0" fill="rgb(238,158,36)" rx="2" ry="2" />
+<text  x="1118.89" y="391.5" ></text>
+</g>
+<g >
+<title>cudaGetDevice (1 samples, 0.07%)</title><rect x="1129.3" y="189" width="1.1" height="15.0" fill="rgb(246,109,46)" rx="2" ry="2" />
+<text  x="1132.31" y="199.5" ></text>
+</g>
+<g >
+<title>transformer_engine::pytorch::quantizer_helper (6 samples, 0.42%)</title><rect x="1133.8" y="397" width="6.7" height="15.0" fill="rgb(243,158,41)" rx="2" ry="2" />
+<text  x="1136.78" y="407.5" ></text>
+</g>
+<g >
+<title>0xffffe4b9fe8c (1 samples, 0.07%)</title><rect x="1461.4" y="429" width="1.1" height="15.0" fill="rgb(234,96,32)" rx="2" ry="2" />
+<text  x="1464.41" y="439.5" ></text>
+</g>
+<g >
+<title>PyUnicode_InternInPlace (1 samples, 0.07%)</title><rect x="76.0" y="493" width="1.1" height="15.0" fill="rgb(252,226,52)" rx="2" ry="2" />
+<text  x="78.97" y="503.5" ></text>
+</g>
+<g >
+<title>0xffffe4c81fdc (3 samples, 0.21%)</title><rect x="24.5" y="397" width="3.4" height="15.0" fill="rgb(234,96,31)" rx="2" ry="2" />
+<text  x="27.54" y="407.5" ></text>
+</g>
+<g >
+<title>0xfff8e8c00308 (1 samples, 0.07%)</title><rect x="1453.6" y="461" width="1.1" height="15.0" fill="rgb(238,96,36)" rx="2" ry="2" />
+<text  x="1456.58" y="471.5" ></text>
+</g>
+<g >
+<title>0xffff05a63c44 (1 samples, 0.07%)</title><rect x="1441.3" y="365" width="1.1" height="15.0" fill="rgb(240,96,39)" rx="2" ry="2" />
+<text  x="1444.28" y="375.5" ></text>
+</g>
+<g >
+<title>torch::autograd::AutogradMeta::~AutogradMeta (1 samples, 0.07%)</title><rect x="1153.9" y="381" width="1.1" height="15.0" fill="rgb(232,157,30)" rx="2" ry="2" />
+<text  x="1156.91" y="391.5" ></text>
+</g>
+<g >
+<title>0xfffe546ba268 (1 samples, 0.07%)</title><rect x="1456.9" y="349" width="1.2" height="15.0" fill="rgb(232,96,29)" rx="2" ry="2" />
+<text  x="1459.94" y="359.5" ></text>
+</g>
+<g >
+<title>0xffff05a914fc (1 samples, 0.07%)</title><rect x="1160.6" y="397" width="1.1" height="15.0" fill="rgb(233,96,31)" rx="2" ry="2" />
+<text  x="1163.62" y="407.5" ></text>
+</g>
+<g >
+<title>0xffff05a90be0 (4 samples, 0.28%)</title><rect x="1539.7" y="413" width="4.5" height="15.0" fill="rgb(237,96,35)" rx="2" ry="2" />
+<text  x="1542.68" y="423.5" ></text>
+</g>
+<g >
+<title>$x (1 samples, 0.07%)</title><rect x="1439.0" y="301" width="1.2" height="15.0" fill="rgb(251,113,50)" rx="2" ry="2" />
+<text  x="1442.04" y="311.5" ></text>
+</g>
+<g >
+<title>$x (4 samples, 0.28%)</title><rect x="1134.9" y="285" width="4.5" height="15.0" fill="rgb(251,113,50)" rx="2" ry="2" />
+<text  x="1137.90" y="295.5" ></text>
+</g>
+<g >
+<title>0xffff05ade950 (914 samples, 64.69%)</title><rect x="82.7" y="349" width="1022.0" height="15.0" fill="rgb(224,96,21)" rx="2" ry="2" />
+<text  x="85.68" y="359.5" >0xffff05ade950</text>
+</g>
+<g >
+<title>0xffffe4c6f824 (3 samples, 0.21%)</title><rect x="24.5" y="381" width="3.4" height="15.0" fill="rgb(239,96,37)" rx="2" ry="2" />
+<text  x="27.54" y="391.5" ></text>
+</g>
+<g >
+<title>NpyIter_AdvancedNew (1 samples, 0.07%)</title><rect x="1105.8" y="429" width="1.1" height="15.0" fill="rgb(232,152,30)" rx="2" ry="2" />
+<text  x="1108.82" y="439.5" ></text>
+</g>
+<g >
+<title>torch::empty (4 samples, 0.28%)</title><rect x="1522.9" y="397" width="4.5" height="15.0" fill="rgb(243,157,42)" rx="2" ry="2" />
+<text  x="1525.91" y="407.5" ></text>
+</g>
+<g >
+<title>0xffffe4c1fa74 (3 samples, 0.21%)</title><rect x="24.5" y="413" width="3.4" height="15.0" fill="rgb(250,96,50)" rx="2" ry="2" />
+<text  x="27.54" y="423.5" ></text>
+</g>
+<g >
+<title>0xfffe546b4dd8 (1 samples, 0.07%)</title><rect x="1129.3" y="157" width="1.1" height="15.0" fill="rgb(240,96,39)" rx="2" ry="2" />
+<text  x="1132.31" y="167.5" ></text>
+</g>
+<g >
+<title>0xffff05ad7a50 (15 samples, 1.06%)</title><rect x="1047.7" y="253" width="16.8" height="15.0" fill="rgb(230,96,28)" rx="2" ry="2" />
+<text  x="1050.68" y="263.5" ></text>
+</g>
+<g >
+<title>0xffff05b1d9fc (2 samples, 0.14%)</title><rect x="1540.8" y="381" width="2.2" height="15.0" fill="rgb(229,96,27)" rx="2" ry="2" />
+<text  x="1543.80" y="391.5" ></text>
+</g>
+<g >
+<title>$x (1 samples, 0.07%)</title><rect x="1439.0" y="237" width="1.2" height="15.0" fill="rgb(251,113,50)" rx="2" ry="2" />
+<text  x="1442.04" y="247.5" ></text>
+</g>
+<g >
+<title>0xffffe58641d4 (1 samples, 0.07%)</title><rect x="1109.2" y="413" width="1.1" height="15.0" fill="rgb(249,96,49)" rx="2" ry="2" />
+<text  x="1112.18" y="423.5" ></text>
+</g>
+<g >
+<title>pybind11::detail::argument_loader&lt;&gt;::call_impl&lt;&gt; (1 samples, 0.07%)</title><rect x="1581.1" y="461" width="1.1" height="15.0" fill="rgb(246,207,45)" rx="2" ry="2" />
+<text  x="1584.05" y="471.5" ></text>
+</g>
+<g >
+<title>PyTuple_New (1 samples, 0.07%)</title><rect x="73.7" y="493" width="1.2" height="15.0" fill="rgb(232,230,30)" rx="2" ry="2" />
+<text  x="76.74" y="503.5" ></text>
+</g>
+<g >
+<title>0xffffe4bbee98 (1 samples, 0.07%)</title><rect x="1535.2" y="445" width="1.1" height="15.0" fill="rgb(238,96,37)" rx="2" ry="2" />
+<text  x="1538.21" y="455.5" ></text>
+</g>
+<g >
+<title>at::_ops::empty_memory_format::call (1 samples, 0.07%)</title><rect x="1126.0" y="365" width="1.1" height="15.0" fill="rgb(230,111,28)" rx="2" ry="2" />
+<text  x="1128.95" y="375.5" ></text>
+</g>
+<g >
+<title>0xfffe546b4dd8 (2 samples, 0.14%)</title><rect x="1540.8" y="365" width="2.2" height="15.0" fill="rgb(240,96,39)" rx="2" ry="2" />
+<text  x="1543.80" y="375.5" ></text>
+</g>
+<g >
+<title>0xfffe546c2bd0 (1 samples, 0.07%)</title><rect x="1129.3" y="93" width="1.1" height="15.0" fill="rgb(238,96,36)" rx="2" ry="2" />
+<text  x="1132.31" y="103.5" ></text>
+</g>
+<g >
+<title>0xfffe546b4dd8 (1 samples, 0.07%)</title><rect x="1546.4" y="301" width="1.1" height="15.0" fill="rgb(240,96,39)" rx="2" ry="2" />
+<text  x="1549.39" y="311.5" ></text>
+</g>
+<g >
+<title>0xfff8e8cde4d0 (1 samples, 0.07%)</title><rect x="1459.2" y="461" width="1.1" height="15.0" fill="rgb(237,96,35)" rx="2" ry="2" />
+<text  x="1462.17" y="471.5" ></text>
+</g>
+<g >
+<title>0xffff05a64294 (1 samples, 0.07%)</title><rect x="1117.0" y="333" width="1.1" height="15.0" fill="rgb(247,96,47)" rx="2" ry="2" />
+<text  x="1120.01" y="343.5" ></text>
+</g>
+<g >
+<title>0xffff05a641f0 (1 samples, 0.07%)</title><rect x="1518.4" y="333" width="1.2" height="15.0" fill="rgb(237,96,35)" rx="2" ry="2" />
+<text  x="1521.44" y="343.5" ></text>
+</g>
+<g >
+<title>torch::autograd::Engine::compute_dependencies (2 samples, 0.14%)</title><rect x="1142.7" y="413" width="2.3" height="15.0" fill="rgb(237,157,36)" rx="2" ry="2" />
+<text  x="1145.72" y="423.5" ></text>
+</g>
+<g >
+<title>0xffffe585a4a4 (1 samples, 0.07%)</title><rect x="1509.5" y="381" width="1.1" height="15.0" fill="rgb(238,96,37)" rx="2" ry="2" />
+<text  x="1512.49" y="391.5" ></text>
+</g>
+<g >
+<title>at::_ops::empty_memory_format::redispatch (3 samples, 0.21%)</title><rect x="1128.2" y="333" width="3.3" height="15.0" fill="rgb(242,111,41)" rx="2" ry="2" />
+<text  x="1131.19" y="343.5" ></text>
+</g>
+<g >
+<title>transformer_engine::fused_attn::FusedAttnConfig::derive (1 samples, 0.07%)</title><rect x="1518.4" y="381" width="1.2" height="15.0" fill="rgb(238,158,36)" rx="2" ry="2" />
+<text  x="1521.44" y="391.5" ></text>
+</g>
+<g >
+<title>c10::cuda::current_device (1 samples, 0.07%)</title><rect x="1139.4" y="365" width="1.1" height="15.0" fill="rgb(246,132,46)" rx="2" ry="2" />
+<text  x="1142.37" y="375.5" ></text>
+</g>
+<g >
+<title>0x5866b8 (1 samples, 0.07%)</title><rect x="58.1" y="493" width="1.1" height="15.0" fill="rgb(229,99,26)" rx="2" ry="2" />
+<text  x="61.08" y="503.5" ></text>
+</g>
+<g >
+<title>0x524c5c (1 samples, 0.07%)</title><rect x="1427.9" y="461" width="1.1" height="15.0" fill="rgb(227,99,24)" rx="2" ry="2" />
+<text  x="1430.86" y="471.5" ></text>
+</g>
+<g >
+<title>__libc_free (1 samples, 0.07%)</title><rect x="1568.8" y="429" width="1.1" height="15.0" fill="rgb(246,154,46)" rx="2" ry="2" />
+<text  x="1571.75" y="439.5" ></text>
+</g>
+<g >
+<title>0xfffe546ba434 (1 samples, 0.07%)</title><rect x="1115.9" y="285" width="1.1" height="15.0" fill="rgb(241,96,39)" rx="2" ry="2" />
+<text  x="1118.89" y="295.5" ></text>
+</g>
+<g >
+<title>operator new (1 samples, 0.07%)</title><rect x="1460.3" y="477" width="1.1" height="15.0" fill="rgb(235,195,33)" rx="2" ry="2" />
+<text  x="1463.29" y="487.5" ></text>
+</g>
+<g >
+<title>cuCtxGetDevice_v2 (1 samples, 0.07%)</title><rect x="1126.0" y="205" width="1.1" height="15.0" fill="rgb(238,100,36)" rx="2" ry="2" />
+<text  x="1128.95" y="215.5" ></text>
+</g>
+<g >
+<title>$x (2 samples, 0.14%)</title><rect x="1527.4" y="301" width="2.2" height="15.0" fill="rgb(251,113,50)" rx="2" ry="2" />
+<text  x="1530.38" y="311.5" ></text>
+</g>
+<g >
+<title>0xfffe54632354 (2 samples, 0.14%)</title><rect x="1540.8" y="285" width="2.2" height="15.0" fill="rgb(239,96,38)" rx="2" ry="2" />
+<text  x="1543.80" y="295.5" ></text>
+</g>
+<g >
+<title>c10::TensorImpl::TensorImpl (1 samples, 0.07%)</title><rect x="1137.1" y="189" width="1.2" height="15.0" fill="rgb(238,132,36)" rx="2" ry="2" />
+<text  x="1140.13" y="199.5" ></text>
+</g>
+<g >
+<title>0xfffe70a583d0 (1 samples, 0.07%)</title><rect x="78.2" y="413" width="1.1" height="15.0" fill="rgb(237,96,36)" rx="2" ry="2" />
+<text  x="81.21" y="423.5" ></text>
+</g>
+<g >
+<title>0xfffe70a92aa8 (2 samples, 0.14%)</title><rect x="80.4" y="413" width="2.3" height="15.0" fill="rgb(233,96,31)" rx="2" ry="2" />
+<text  x="83.45" y="423.5" ></text>
+</g>
+<g >
+<title>$x (6 samples, 0.42%)</title><rect x="1544.2" y="413" width="6.7" height="15.0" fill="rgb(251,113,50)" rx="2" ry="2" />
+<text  x="1547.15" y="423.5" ></text>
+</g>
+<g >
+<title>thread: pt_autograd_0 (79 samples, 5.59%)</title><rect x="1501.7" y="509" width="88.3" height="15.0" fill="rgb(230,137,28)" rx="2" ry="2" />
+<text  x="1504.66" y="519.5" >thread: pt..</text>
+</g>
+<g >
+<title>$x (1 samples, 0.07%)</title><rect x="1552.0" y="365" width="1.1" height="15.0" fill="rgb(251,113,50)" rx="2" ry="2" />
+<text  x="1554.98" y="375.5" ></text>
+</g>
+<g >
+<title>0xffff05bbef90 (3 samples, 0.21%)</title><rect x="117.3" y="285" width="3.4" height="15.0" fill="rgb(234,96,32)" rx="2" ry="2" />
+<text  x="120.35" y="295.5" ></text>
+</g>
+<g >
+<title>0xfffe546b4be4 (1 samples, 0.07%)</title><rect x="1538.6" y="413" width="1.1" height="15.0" fill="rgb(247,96,47)" rx="2" ry="2" />
+<text  x="1541.56" y="423.5" ></text>
+</g>
+<g >
+<title>[Broken backtraces] (3 samples, 0.21%)</title><rect x="24.5" y="493" width="3.4" height="15.0" fill="rgb(240,202,39)" rx="2" ry="2" />
+<text  x="27.54" y="503.5" ></text>
+</g>
+<g >
+<title>0x50332c (32 samples, 2.26%)</title><rect x="1104.7" y="477" width="35.8" height="15.0" fill="rgb(230,99,28)" rx="2" ry="2" />
+<text  x="1107.71" y="487.5" >0x5..</text>
+</g>
+<g >
+<title>0xffff05ad78dc (2 samples, 0.14%)</title><rect x="271.7" y="253" width="2.2" height="15.0" fill="rgb(232,96,30)" rx="2" ry="2" />
+<text  x="274.66" y="263.5" ></text>
+</g>
+<g >
+<title>cudaGetDevice (1 samples, 0.07%)</title><rect x="1139.4" y="333" width="1.1" height="15.0" fill="rgb(246,109,46)" rx="2" ry="2" />
+<text  x="1142.37" y="343.5" ></text>
+</g>
+<g >
+<title>pybind11::detail::get_type_info (1 samples, 0.07%)</title><rect x="1533.0" y="397" width="1.1" height="15.0" fill="rgb(248,207,47)" rx="2" ry="2" />
+<text  x="1535.97" y="407.5" ></text>
+</g>
+<g >
+<title>transformer_engine::pytorch::allocateSpace (2 samples, 0.14%)</title><rect x="1527.4" y="397" width="2.2" height="15.0" fill="rgb(252,158,52)" rx="2" ry="2" />
+<text  x="1530.38" y="407.5" ></text>
+</g>
+<g >
+<title>0x5150e0 (1 samples, 0.07%)</title><rect x="1503.9" y="493" width="1.1" height="15.0" fill="rgb(238,99,37)" rx="2" ry="2" />
+<text  x="1506.90" y="503.5" ></text>
+</g>
+<g >
+<title>cuCtxGetCurrent (2 samples, 0.14%)</title><rect x="1115.9" y="349" width="2.2" height="15.0" fill="rgb(241,100,39)" rx="2" ry="2" />
+<text  x="1118.89" y="359.5" ></text>
+</g>
+<g >
+<title>[Broken backtraces] (3 samples, 0.21%)</title><rect x="21.2" y="493" width="3.3" height="15.0" fill="rgb(240,202,39)" rx="2" ry="2" />
+<text  x="24.18" y="503.5" ></text>
+</g>
+<g >
+<title>[Broken backtraces] (69 samples, 4.88%)</title><rect x="1508.4" y="493" width="77.1" height="15.0" fill="rgb(240,202,39)" rx="2" ry="2" />
+<text  x="1511.37" y="503.5" >[Broken ..</text>
+</g>
+<g >
+<title>_PyObject_GC_New (1 samples, 0.07%)</title><rect x="1495.0" y="493" width="1.1" height="15.0" fill="rgb(232,171,30)" rx="2" ry="2" />
+<text  x="1497.95" y="503.5" ></text>
+</g>
+<g >
+<title>__pthread_mutex_trylock (1 samples, 0.07%)</title><rect x="1511.7" y="365" width="1.1" height="15.0" fill="rgb(240,141,39)" rx="2" ry="2" />
+<text  x="1514.73" y="375.5" ></text>
+</g>
+<g >
+<title>0xfffe546c30fc (1 samples, 0.07%)</title><rect x="1117.0" y="253" width="1.1" height="15.0" fill="rgb(236,96,34)" rx="2" ry="2" />
+<text  x="1120.01" y="263.5" ></text>
+</g>
+<g >
+<title>0xffffc71e8c74 (1 samples, 0.07%)</title><rect x="1435.7" y="365" width="1.1" height="15.0" fill="rgb(249,96,48)" rx="2" ry="2" />
+<text  x="1438.69" y="375.5" ></text>
+</g>
+<g >
+<title>0xffffd8055050 (1 samples, 0.07%)</title><rect x="23.4" y="413" width="1.1" height="15.0" fill="rgb(231,96,28)" rx="2" ry="2" />
+<text  x="26.42" y="423.5" ></text>
+</g>
+<g >
+<title>at::detail::empty_cuda (1 samples, 0.07%)</title><rect x="1528.5" y="269" width="1.1" height="15.0" fill="rgb(235,111,33)" rx="2" ry="2" />
+<text  x="1531.50" y="279.5" ></text>
+</g>
+<g >
+<title>0x503048 (914 samples, 64.69%)</title><rect x="82.7" y="477" width="1022.0" height="15.0" fill="rgb(235,99,33)" rx="2" ry="2" />
+<text  x="85.68" y="487.5" >0x503048</text>
+</g>
+<g >
+<title>0xffff05bd050c (1 samples, 0.07%)</title><rect x="1162.9" y="365" width="1.1" height="15.0" fill="rgb(231,96,29)" rx="2" ry="2" />
+<text  x="1165.85" y="375.5" ></text>
+</g>
+<g >
+<title>__pthread_getspecific (1 samples, 0.07%)</title><rect x="1129.3" y="61" width="1.1" height="15.0" fill="rgb(228,141,25)" rx="2" ry="2" />
+<text  x="1132.31" y="71.5" ></text>
+</g>
+<g >
+<title>THPPointer&lt;&gt;::free (1 samples, 0.07%)</title><rect x="1148.3" y="445" width="1.1" height="15.0" fill="rgb(246,141,46)" rx="2" ry="2" />
+<text  x="1151.32" y="455.5" ></text>
+</g>
+<g >
+<title>0xfff8e8c055d0 (1 samples, 0.07%)</title><rect x="1573.2" y="461" width="1.1" height="15.0" fill="rgb(236,96,34)" rx="2" ry="2" />
+<text  x="1576.23" y="471.5" ></text>
+</g>
+<g >
+<title>cudnn::backend::VariantPack::set_internal (1 samples, 0.07%)</title><rect x="1562.0" y="477" width="1.2" height="15.0" fill="rgb(229,109,27)" rx="2" ry="2" />
+<text  x="1565.05" y="487.5" ></text>
+</g>
+<g >
+<title>cuCtxGetDevice_v2 (1 samples, 0.07%)</title><rect x="1114.8" y="317" width="1.1" height="15.0" fill="rgb(238,100,36)" rx="2" ry="2" />
+<text  x="1117.77" y="327.5" ></text>
+</g>
+<g >
+<title>0xffff05bbeea8 (1 samples, 0.07%)</title><rect x="110.6" y="285" width="1.2" height="15.0" fill="rgb(231,96,28)" rx="2" ry="2" />
+<text  x="113.64" y="295.5" ></text>
+</g>
+<g >
+<title>std::condition_variable::wait (3 samples, 0.21%)</title><rect x="1582.2" y="477" width="3.3" height="15.0" fill="rgb(237,146,35)" rx="2" ry="2" />
+<text  x="1585.17" y="487.5" ></text>
+</g>
+<g >
+<title>0x5609d0 (1 samples, 0.07%)</title><rect x="1155.0" y="477" width="1.1" height="15.0" fill="rgb(233,99,31)" rx="2" ry="2" />
+<text  x="1158.02" y="487.5" ></text>
+</g>
+<g >
+<title>0x596f40 (1 samples, 0.07%)</title><rect x="60.3" y="493" width="1.1" height="15.0" fill="rgb(228,99,25)" rx="2" ry="2" />
+<text  x="63.32" y="503.5" ></text>
+</g>
+<g >
+<title>0xfffe546ba268 (1 samples, 0.07%)</title><rect x="1538.6" y="381" width="1.1" height="15.0" fill="rgb(232,96,29)" rx="2" ry="2" />
+<text  x="1541.56" y="391.5" ></text>
+</g>
+<g >
+<title>0xfff8e8c00944 (1 samples, 0.07%)</title><rect x="1566.5" y="445" width="1.1" height="15.0" fill="rgb(236,96,34)" rx="2" ry="2" />
+<text  x="1569.52" y="455.5" ></text>
+</g>
+<g >
+<title>0xffff05bbef88 (2 samples, 0.14%)</title><rect x="115.1" y="285" width="2.2" height="15.0" fill="rgb(239,96,37)" rx="2" ry="2" />
+<text  x="118.11" y="295.5" ></text>
+</g>
+<g >
+<title>PyObject_Free (1 samples, 0.07%)</title><rect x="65.9" y="493" width="1.1" height="15.0" fill="rgb(246,207,46)" rx="2" ry="2" />
+<text  x="68.91" y="503.5" ></text>
+</g>
+<g >
+<title>0xffff05408e6c (3 samples, 0.21%)</title><rect x="1160.6" y="477" width="3.4" height="15.0" fill="rgb(224,96,21)" rx="2" ry="2" />
+<text  x="1163.62" y="487.5" ></text>
+</g>
+<g >
+<title>0xffff05a155fc (1 samples, 0.07%)</title><rect x="1538.6" y="445" width="1.1" height="15.0" fill="rgb(232,96,30)" rx="2" ry="2" />
+<text  x="1541.56" y="455.5" ></text>
+</g>
+<g >
+<title>0xfffe546ba434 (1 samples, 0.07%)</title><rect x="1441.3" y="317" width="1.1" height="15.0" fill="rgb(241,96,39)" rx="2" ry="2" />
+<text  x="1444.28" y="327.5" ></text>
+</g>
+<g >
+<title>0x4dc130 (1 samples, 0.07%)</title><rect x="34.6" y="493" width="1.1" height="15.0" fill="rgb(232,102,30)" rx="2" ry="2" />
+<text  x="37.60" y="503.5" ></text>
+</g>
+<g >
+<title>0xffff05bbe47c (4 samples, 0.28%)</title><rect x="167.7" y="301" width="4.4" height="15.0" fill="rgb(236,96,34)" rx="2" ry="2" />
+<text  x="170.66" y="311.5" ></text>
+</g>
+<g >
+<title>0x5a4020 (3 samples, 0.21%)</title><rect x="1534.1" y="477" width="3.3" height="15.0" fill="rgb(234,99,32)" rx="2" ry="2" />
+<text  x="1537.09" y="487.5" ></text>
+</g>
+<g >
+<title>0xffff05bbfba0 (2 samples, 0.14%)</title><rect x="224.7" y="285" width="2.2" height="15.0" fill="rgb(229,96,27)" rx="2" ry="2" />
+<text  x="227.69" y="295.5" ></text>
+</g>
+<g >
+<title>0xffff05aa853c (1 samples, 0.07%)</title><rect x="1575.5" y="397" width="1.1" height="15.0" fill="rgb(228,96,25)" rx="2" ry="2" />
+<text  x="1578.46" y="407.5" ></text>
+</g>
+<g >
+<title>NSYS_OSRT_pthread_cond_signal_1 (1 samples, 0.07%)</title><rect x="1158.4" y="461" width="1.1" height="15.0" fill="rgb(231,119,29)" rx="2" ry="2" />
+<text  x="1161.38" y="471.5" ></text>
+</g>
+<g >
+<title>0xfffe546c3574 (1 samples, 0.07%)</title><rect x="1538.6" y="365" width="1.1" height="15.0" fill="rgb(248,96,47)" rx="2" ry="2" />
+<text  x="1541.56" y="375.5" ></text>
+</g>
+<g >
+<title>0xffffe5871c38 (1 samples, 0.07%)</title><rect x="1583.3" y="413" width="1.1" height="15.0" fill="rgb(234,96,32)" rx="2" ry="2" />
+<text  x="1586.29" y="423.5" ></text>
+</g>
+<g >
+<title>0xffff05bbe484 (1 samples, 0.07%)</title><rect x="172.1" y="301" width="1.2" height="15.0" fill="rgb(247,96,46)" rx="2" ry="2" />
+<text  x="175.14" y="311.5" ></text>
+</g>
+<g >
+<title>0xffff05b21010 (1 samples, 0.07%)</title><rect x="1160.6" y="381" width="1.1" height="15.0" fill="rgb(235,96,33)" rx="2" ry="2" />
+<text  x="1163.62" y="391.5" ></text>
+</g>
+<g >
+<title>0xffffe49e4fa4 (2 samples, 0.14%)</title><rect x="1111.4" y="381" width="2.3" height="15.0" fill="rgb(237,96,35)" rx="2" ry="2" />
+<text  x="1114.42" y="391.5" ></text>
+</g>
+<g >
+<title>$x (1 samples, 0.07%)</title><rect x="1530.7" y="221" width="1.2" height="15.0" fill="rgb(251,113,50)" rx="2" ry="2" />
+<text  x="1533.74" y="231.5" ></text>
+</g>
+<g >
+<title>0xfffe546b4be4 (1 samples, 0.07%)</title><rect x="1546.4" y="285" width="1.1" height="15.0" fill="rgb(247,96,47)" rx="2" ry="2" />
+<text  x="1549.39" y="295.5" ></text>
+</g>
+<g >
+<title>$x (1 samples, 0.07%)</title><rect x="1439.0" y="253" width="1.2" height="15.0" fill="rgb(251,113,50)" rx="2" ry="2" />
+<text  x="1442.04" y="263.5" ></text>
+</g>
+<g >
+<title>0xffff05c150b0 (1 samples, 0.07%)</title><rect x="1458.1" y="413" width="1.1" height="15.0" fill="rgb(230,96,27)" rx="2" ry="2" />
+<text  x="1461.05" y="423.5" ></text>
+</g>
+<g >
+<title>0xffff05bbf094 (2 samples, 0.14%)</title><rect x="129.6" y="285" width="2.3" height="15.0" fill="rgb(249,96,48)" rx="2" ry="2" />
+<text  x="132.65" y="295.5" ></text>
+</g>
+<g >
+<title>$x (1 samples, 0.07%)</title><rect x="1439.0" y="333" width="1.2" height="15.0" fill="rgb(251,113,50)" rx="2" ry="2" />
+<text  x="1442.04" y="343.5" ></text>
+</g>
+<g >
+<title>__memcmpeq (1 samples, 0.07%)</title><rect x="78.2" y="397" width="1.1" height="15.0" fill="rgb(244,151,43)" rx="2" ry="2" />
+<text  x="81.21" y="407.5" ></text>
+</g>
+<g >
+<title>c10::TensorImpl::~TensorImpl (3 samples, 0.21%)</title><rect x="1151.7" y="429" width="3.3" height="15.0" fill="rgb(238,132,36)" rx="2" ry="2" />
+<text  x="1154.67" y="439.5" ></text>
+</g>
+<g >
+<title>torch::autograd::Engine::execute (4 samples, 0.28%)</title><rect x="1140.5" y="429" width="4.5" height="15.0" fill="rgb(240,157,38)" rx="2" ry="2" />
+<text  x="1143.49" y="439.5" ></text>
+</g>
+<g >
+<title>0xffff05bbe3f8 (1 samples, 0.07%)</title><rect x="109.5" y="301" width="1.1" height="15.0" fill="rgb(239,96,37)" rx="2" ry="2" />
+<text  x="112.52" y="311.5" ></text>
+</g>
+<g >
+<title>0xffffc42d1ae0 (14 samples, 0.99%)</title><rect x="1544.2" y="477" width="15.6" height="15.0" fill="rgb(238,96,36)" rx="2" ry="2" />
+<text  x="1547.15" y="487.5" ></text>
+</g>
+<g >
+<title>__libc_malloc (1 samples, 0.07%)</title><rect x="1579.9" y="461" width="1.2" height="15.0" fill="rgb(238,154,36)" rx="2" ry="2" />
+<text  x="1582.94" y="471.5" ></text>
+</g>
+<g >
+<title>transformer_engine::pytorch::NoneQuantizer::create_tensor (2 samples, 0.14%)</title><rect x="1530.7" y="381" width="2.3" height="15.0" fill="rgb(242,158,40)" rx="2" ry="2" />
+<text  x="1533.74" y="391.5" ></text>
+</g>
+<g >
+<title>0xfffe70acd50c (4 samples, 0.28%)</title><rect x="78.2" y="461" width="4.5" height="15.0" fill="rgb(231,96,29)" rx="2" ry="2" />
+<text  x="81.21" y="471.5" ></text>
+</g>
+<g >
+<title>0xfffe545cc368 (1 samples, 0.07%)</title><rect x="1517.3" y="189" width="1.1" height="15.0" fill="rgb(231,96,29)" rx="2" ry="2" />
+<text  x="1520.32" y="199.5" ></text>
+</g>
+<g >
+<title>cuCtxGetDevice_v2 (1 samples, 0.07%)</title><rect x="1581.1" y="301" width="1.1" height="15.0" fill="rgb(238,100,36)" rx="2" ry="2" />
+<text  x="1584.05" y="311.5" ></text>
+</g>
+<g >
+<title>$x (1 samples, 0.07%)</title><rect x="1522.9" y="269" width="1.1" height="15.0" fill="rgb(251,113,50)" rx="2" ry="2" />
+<text  x="1525.91" y="279.5" ></text>
+</g>
+<g >
+<title>std::_Hashtable&lt;&gt;::~_Hashtable (1 samples, 0.07%)</title><rect x="1520.7" y="349" width="1.1" height="15.0" fill="rgb(241,146,40)" rx="2" ry="2" />
+<text  x="1523.67" y="359.5" ></text>
+</g>
+<g >
+<title>0xfffe546278e8 (1 samples, 0.07%)</title><rect x="1517.3" y="205" width="1.1" height="15.0" fill="rgb(236,96,34)" rx="2" ry="2" />
+<text  x="1520.32" y="215.5" ></text>
+</g>
+<g >
+<title>0xfffe70a91b6c (1 samples, 0.07%)</title><rect x="79.3" y="429" width="1.1" height="15.0" fill="rgb(226,96,24)" rx="2" ry="2" />
+<text  x="82.33" y="439.5" ></text>
+</g>
+<g >
+<title>0x5034e0 (1 samples, 0.07%)</title><rect x="1425.6" y="461" width="1.1" height="15.0" fill="rgb(236,99,34)" rx="2" ry="2" />
+<text  x="1428.63" y="471.5" ></text>
+</g>
+<g >
+<title>0xffff05ad796c (21 samples, 1.49%)</title><rect x="988.4" y="253" width="23.5" height="15.0" fill="rgb(222,96,18)" rx="2" ry="2" />
+<text  x="991.41" y="263.5" >0..</text>
+</g>
+<g >
+<title>transformer_engine::fused_attn::FusedAttnConfig::make_cache_key (1 samples, 0.07%)</title><rect x="1581.1" y="365" width="1.1" height="15.0" fill="rgb(243,158,42)" rx="2" ry="2" />
+<text  x="1584.05" y="375.5" ></text>
+</g>
+<g >
+<title>__libc_free (1 samples, 0.07%)</title><rect x="1520.7" y="333" width="1.1" height="15.0" fill="rgb(246,154,46)" rx="2" ry="2" />
+<text  x="1523.67" y="343.5" ></text>
+</g>
+<g >
+<title>0xffff05a65668 (1 samples, 0.07%)</title><rect x="1143.8" y="349" width="1.2" height="15.0" fill="rgb(229,96,26)" rx="2" ry="2" />
+<text  x="1146.84" y="359.5" ></text>
+</g>
+<g >
+<title>0xfff8e8c00a98 (1 samples, 0.07%)</title><rect x="1565.4" y="445" width="1.1" height="15.0" fill="rgb(241,96,40)" rx="2" ry="2" />
+<text  x="1568.40" y="455.5" ></text>
+</g>
+<g >
+<title>0xffffe4c8a6f0 (1 samples, 0.07%)</title><rect x="1159.5" y="397" width="1.1" height="15.0" fill="rgb(233,96,31)" rx="2" ry="2" />
+<text  x="1162.50" y="407.5" ></text>
+</g>
+<g >
+<title>_pthread_cleanup_push (1 samples, 0.07%)</title><rect x="1584.4" y="429" width="1.1" height="15.0" fill="rgb(236,154,34)" rx="2" ry="2" />
+<text  x="1587.41" y="439.5" ></text>
+</g>
+<g >
+<title>0xffff05ad7a5c (1 samples, 0.07%)</title><rect x="1079.0" y="253" width="1.1" height="15.0" fill="rgb(228,96,26)" rx="2" ry="2" />
+<text  x="1081.99" y="263.5" ></text>
+</g>
+<g >
+<title>PyArray_DiscoverDTypeAndShape (1 samples, 0.07%)</title><rect x="1104.7" y="413" width="1.1" height="15.0" fill="rgb(250,213,49)" rx="2" ry="2" />
+<text  x="1107.71" y="423.5" ></text>
+</g>
+<g >
+<title>0x4fcc00 (1 samples, 0.07%)</title><rect x="43.5" y="493" width="1.2" height="15.0" fill="rgb(234,102,32)" rx="2" ry="2" />
+<text  x="46.55" y="503.5" ></text>
+</g>
+<g >
+<title>0xfffe70ad04c4 (1 samples, 0.07%)</title><rect x="79.3" y="413" width="1.1" height="15.0" fill="rgb(248,96,48)" rx="2" ry="2" />
+<text  x="82.33" y="423.5" ></text>
+</g>
+<g >
+<title>torch::is_int_or_symint_list (1 samples, 0.07%)</title><rect x="1145.0" y="413" width="1.1" height="15.0" fill="rgb(232,157,30)" rx="2" ry="2" />
+<text  x="1147.96" y="423.5" ></text>
+</g>
+<g >
+<title>0xfffff7fa0578 (31 samples, 2.19%)</title><rect x="1180.7" y="461" width="34.7" height="15.0" fill="rgb(241,96,39)" rx="2" ry="2" />
+<text  x="1183.74" y="471.5" >0x..</text>
+</g>
+<g >
+<title>transformer_engine::fused_attn::FusedAttnConfig::make_cache_key (1 samples, 0.07%)</title><rect x="1121.5" y="333" width="1.1" height="15.0" fill="rgb(243,158,42)" rx="2" ry="2" />
+<text  x="1124.48" y="343.5" ></text>
+</g>
+<g >
+<title>$x (4 samples, 0.28%)</title><rect x="1522.9" y="301" width="4.5" height="15.0" fill="rgb(251,113,50)" rx="2" ry="2" />
+<text  x="1525.91" y="311.5" ></text>
+</g>
+<g >
+<title>0xfff8e8c06d84 (1 samples, 0.07%)</title><rect x="1576.6" y="413" width="1.1" height="15.0" fill="rgb(247,96,46)" rx="2" ry="2" />
+<text  x="1579.58" y="423.5" ></text>
+</g>
+<g >
+<title>$x (1 samples, 0.07%)</title><rect x="1126.0" y="317" width="1.1" height="15.0" fill="rgb(251,113,50)" rx="2" ry="2" />
+<text  x="1128.95" y="327.5" ></text>
+</g>
+<g >
+<title>$x (1 samples, 0.07%)</title><rect x="1528.5" y="205" width="1.1" height="15.0" fill="rgb(251,113,50)" rx="2" ry="2" />
+<text  x="1531.50" y="215.5" ></text>
+</g>
+<g >
+<title>transformer_engine::pytorch::fused_attn_fwd (27 samples, 1.91%)</title><rect x="1110.3" y="413" width="30.2" height="15.0" fill="rgb(240,158,39)" rx="2" ry="2" />
+<text  x="1113.30" y="423.5" >tr..</text>
+</g>
+<g >
+<title>0xfffe546278e8 (1 samples, 0.07%)</title><rect x="1555.3" y="205" width="1.2" height="15.0" fill="rgb(236,96,34)" rx="2" ry="2" />
+<text  x="1558.34" y="215.5" ></text>
+</g>
+<g >
+<title>0xfffff7fa0584 (1 samples, 0.07%)</title><rect x="1224.4" y="461" width="1.1" height="15.0" fill="rgb(246,96,46)" rx="2" ry="2" />
+<text  x="1227.35" y="471.5" ></text>
+</g>
+<g >
+<title>pybind11::cpp_function::dispatcher (23 samples, 1.63%)</title><rect x="1508.4" y="461" width="25.7" height="15.0" fill="rgb(240,207,38)" rx="2" ry="2" />
+<text  x="1511.37" y="471.5" >p..</text>
+</g>
+<g >
+<title>0xfffe54623454 (1 samples, 0.07%)</title><rect x="1541.9" y="237" width="1.1" height="15.0" fill="rgb(238,96,37)" rx="2" ry="2" />
+<text  x="1544.92" y="247.5" ></text>
+</g>
+<g >
+<title>at::empty (3 samples, 0.21%)</title><rect x="1128.2" y="381" width="3.3" height="15.0" fill="rgb(243,111,42)" rx="2" ry="2" />
+<text  x="1131.19" y="391.5" ></text>
+</g>
+<g >
+<title>0xffff05ad7958 (342 samples, 24.20%)</title><rect x="528.8" y="253" width="382.5" height="15.0" fill="rgb(228,96,25)" rx="2" ry="2" />
+<text  x="531.84" y="263.5" >0xffff05ad7958</text>
+</g>
+<g >
+<title>0xffff05a63c7c (1 samples, 0.07%)</title><rect x="1555.3" y="301" width="1.2" height="15.0" fill="rgb(237,96,35)" rx="2" ry="2" />
+<text  x="1558.34" y="311.5" ></text>
+</g>
+<g >
+<title>0xffffe5872e3c (1 samples, 0.07%)</title><rect x="1156.1" y="461" width="1.2" height="15.0" fill="rgb(228,96,25)" rx="2" ry="2" />
+<text  x="1159.14" y="471.5" ></text>
+</g>
+<g >
+<title>pybind11::detail::type_caster&lt;&gt;::load (1 samples, 0.07%)</title><rect x="1442.4" y="429" width="1.1" height="15.0" fill="rgb(243,207,41)" rx="2" ry="2" />
+<text  x="1445.40" y="439.5" ></text>
+</g>
+<g >
+<title>0xffff05ad795c (31 samples, 2.19%)</title><rect x="911.3" y="253" width="34.6" height="15.0" fill="rgb(223,96,19)" rx="2" ry="2" />
+<text  x="914.26" y="263.5" >0x..</text>
+</g>
+<g >
+<title>0xfffe546c2d9c (1 samples, 0.07%)</title><rect x="1545.3" y="269" width="1.1" height="15.0" fill="rgb(234,96,32)" rx="2" ry="2" />
+<text  x="1548.27" y="279.5" ></text>
+</g>
+<g >
+<title>$x (1 samples, 0.07%)</title><rect x="1439.0" y="317" width="1.2" height="15.0" fill="rgb(251,113,50)" rx="2" ry="2" />
+<text  x="1442.04" y="327.5" ></text>
+</g>
+<g >
+<title>c10::cuda::SetDevice (1 samples, 0.07%)</title><rect x="1128.2" y="269" width="1.1" height="15.0" fill="rgb(246,132,46)" rx="2" ry="2" />
+<text  x="1131.19" y="279.5" ></text>
+</g>
+<g >
+<title>0xffff05ae2ef0 (2 samples, 0.14%)</title><rect x="239.2" y="269" width="2.3" height="15.0" fill="rgb(234,96,32)" rx="2" ry="2" />
+<text  x="242.23" y="279.5" ></text>
+</g>
+<g >
+<title>pybind11::gil_scoped_acquire::gil_scoped_acquire (1 samples, 0.07%)</title><rect x="1131.5" y="349" width="1.2" height="15.0" fill="rgb(242,207,41)" rx="2" ry="2" />
+<text  x="1134.54" y="359.5" ></text>
+</g>
+<g >
+<title>0xfff8e8ce7dc4 (1 samples, 0.07%)</title><rect x="1576.6" y="429" width="1.1" height="15.0" fill="rgb(248,96,48)" rx="2" ry="2" />
+<text  x="1579.58" y="439.5" ></text>
+</g>
+<g >
+<title>cudnn_frontend::graph::Graph::execute_plan_at_index (1 samples, 0.07%)</title><rect x="1120.4" y="333" width="1.1" height="15.0" fill="rgb(250,109,49)" rx="2" ry="2" />
+<text  x="1123.36" y="343.5" ></text>
+</g>
+<g >
+<title>$x (1 samples, 0.07%)</title><rect x="1146.1" y="445" width="1.1" height="15.0" fill="rgb(251,113,50)" rx="2" ry="2" />
+<text  x="1149.08" y="455.5" ></text>
+</g>
+<g >
+<title>(anonymous namespace)::unpack_input (1 samples, 0.07%)</title><rect x="1147.2" y="445" width="1.1" height="15.0" fill="rgb(234,178,31)" rx="2" ry="2" />
+<text  x="1150.20" y="455.5" ></text>
+</g>
+<g >
+<title>0xffffc7176148 (1 samples, 0.07%)</title><rect x="1441.3" y="397" width="1.1" height="15.0" fill="rgb(235,96,33)" rx="2" ry="2" />
+<text  x="1444.28" y="407.5" ></text>
+</g>
+<g >
+<title>pybind11::cpp_function::initialize&lt;&gt;::{lambda()#1}::operator() (28 samples, 1.98%)</title><rect x="1109.2" y="445" width="31.3" height="15.0" fill="rgb(241,207,40)" rx="2" ry="2" />
+<text  x="1112.18" y="455.5" >py..</text>
+</g>
+<g >
+<title>cuGetErrorString (1 samples, 0.07%)</title><rect x="1574.3" y="429" width="1.2" height="15.0" fill="rgb(243,87,42)" rx="2" ry="2" />
+<text  x="1577.35" y="439.5" ></text>
+</g>
+<g >
+<title>0x562260 (1 samples, 0.07%)</title><rect x="1156.1" y="477" width="1.2" height="15.0" fill="rgb(228,99,26)" rx="2" ry="2" />
+<text  x="1159.14" y="487.5" ></text>
+</g>
+<g >
+<title>0xfffff7fc28cc (1 samples, 0.07%)</title><rect x="1552.0" y="333" width="1.1" height="15.0" fill="rgb(233,96,31)" rx="2" ry="2" />
+<text  x="1554.98" y="343.5" ></text>
+</g>
+<g >
+<title>transformer_engine::fused_attn_arbitrary_seqlen_fwd (4 samples, 0.28%)</title><rect x="1119.2" y="381" width="4.5" height="15.0" fill="rgb(240,158,39)" rx="2" ry="2" />
+<text  x="1122.24" y="391.5" ></text>
+</g>
+<g >
+<title>at::detail::empty_generic (1 samples, 0.07%)</title><rect x="1528.5" y="237" width="1.1" height="15.0" fill="rgb(228,111,25)" rx="2" ry="2" />
+<text  x="1531.50" y="247.5" ></text>
+</g>
+<g >
+<title>torch::autograd::SavedVariable::unpack (1 samples, 0.07%)</title><rect x="1560.9" y="429" width="1.1" height="15.0" fill="rgb(242,157,40)" rx="2" ry="2" />
+<text  x="1563.93" y="439.5" ></text>
+</g>
+<g >
+<title>$x (2 samples, 0.14%)</title><rect x="1525.1" y="221" width="2.3" height="15.0" fill="rgb(251,113,50)" rx="2" ry="2" />
+<text  x="1528.15" y="231.5" ></text>
+</g>
+<g >
+<title>0xffffe4c6a064 (1 samples, 0.07%)</title><rect x="1582.2" y="413" width="1.1" height="15.0" fill="rgb(240,96,39)" rx="2" ry="2" />
+<text  x="1585.17" y="423.5" ></text>
+</g>
+<g >
+<title>$x (1 samples, 0.07%)</title><rect x="1522.9" y="285" width="1.1" height="15.0" fill="rgb(251,113,50)" rx="2" ry="2" />
+<text  x="1525.91" y="295.5" ></text>
+</g>
+<g >
+<title>0xffff05a63c7c (1 samples, 0.07%)</title><rect x="1517.3" y="301" width="1.1" height="15.0" fill="rgb(237,96,35)" rx="2" ry="2" />
+<text  x="1520.32" y="311.5" ></text>
+</g>
+<g >
+<title>thread: [NSys] (3 samples, 0.21%)</title><rect x="24.5" y="509" width="3.4" height="15.0" fill="rgb(243,137,42)" rx="2" ry="2" />
+<text  x="27.54" y="519.5" ></text>
+</g>
+<g >
+<title>0xffff05a65630 (1 samples, 0.07%)</title><rect x="1557.6" y="333" width="1.1" height="15.0" fill="rgb(229,96,26)" rx="2" ry="2" />
+<text  x="1560.57" y="343.5" ></text>
+</g>
+<g >
+<title>0xfffe70a91b4c (1 samples, 0.07%)</title><rect x="78.2" y="429" width="1.1" height="15.0" fill="rgb(229,96,26)" rx="2" ry="2" />
+<text  x="81.21" y="439.5" ></text>
+</g>
+<g >
+<title>0xfffe546ba268 (1 samples, 0.07%)</title><rect x="1441.3" y="301" width="1.1" height="15.0" fill="rgb(232,96,29)" rx="2" ry="2" />
+<text  x="1444.28" y="311.5" ></text>
+</g>
+<g >
+<title>0xffff05a90460 (4 samples, 0.28%)</title><rect x="1539.7" y="429" width="4.5" height="15.0" fill="rgb(227,96,24)" rx="2" ry="2" />
+<text  x="1542.68" y="439.5" ></text>
+</g>
+<g >
+<title>c10::cuda::MaybeSetDevice (1 samples, 0.07%)</title><rect x="1440.2" y="429" width="1.1" height="15.0" fill="rgb(246,132,46)" rx="2" ry="2" />
+<text  x="1443.16" y="439.5" ></text>
+</g>
+<g >
+<title>nvte_create_tensor (1 samples, 0.07%)</title><rect x="1509.5" y="397" width="1.1" height="15.0" fill="rgb(242,163,40)" rx="2" ry="2" />
+<text  x="1512.49" y="407.5" ></text>
+</g>
+<g >
+<title>$x (1 samples, 0.07%)</title><rect x="1530.7" y="301" width="1.2" height="15.0" fill="rgb(251,113,50)" rx="2" ry="2" />
+<text  x="1533.74" y="311.5" ></text>
+</g>
+<g >
+<title>cuGetErrorString (1 samples, 0.07%)</title><rect x="1456.9" y="429" width="1.2" height="15.0" fill="rgb(243,87,42)" rx="2" ry="2" />
+<text  x="1459.94" y="439.5" ></text>
+</g>
+<g >
+<title>0xffffc718e85c (1 samples, 0.07%)</title><rect x="1526.3" y="157" width="1.1" height="15.0" fill="rgb(223,96,20)" rx="2" ry="2" />
+<text  x="1529.26" y="167.5" ></text>
+</g>
+<g >
+<title>0xffff05a63c7c (1 samples, 0.07%)</title><rect x="1114.8" y="301" width="1.1" height="15.0" fill="rgb(237,96,35)" rx="2" ry="2" />
+<text  x="1117.77" y="311.5" ></text>
+</g>
+<g >
+<title>0xffff05b608c0 (1 samples, 0.07%)</title><rect x="1103.6" y="317" width="1.1" height="15.0" fill="rgb(235,96,33)" rx="2" ry="2" />
+<text  x="1106.59" y="327.5" ></text>
+</g>
+<g >
+<title>at::native::empty_cuda (1 samples, 0.07%)</title><rect x="1530.7" y="269" width="1.2" height="15.0" fill="rgb(235,111,33)" rx="2" ry="2" />
+<text  x="1533.74" y="279.5" ></text>
+</g>
+<g >
+<title>0xfffe708bf0b0 (1 samples, 0.07%)</title><rect x="81.6" y="381" width="1.1" height="15.0" fill="rgb(230,96,27)" rx="2" ry="2" />
+<text  x="84.56" y="391.5" ></text>
+</g>
+<g >
+<title>0xffff05ad7920 (5 samples, 0.35%)</title><rect x="395.8" y="253" width="5.6" height="15.0" fill="rgb(228,96,25)" rx="2" ry="2" />
+<text  x="398.77" y="263.5" ></text>
+</g>
+<g >
+<title>0xffffc71a6760 (1 samples, 0.07%)</title><rect x="1130.4" y="173" width="1.1" height="15.0" fill="rgb(225,96,22)" rx="2" ry="2" />
+<text  x="1133.42" y="183.5" ></text>
+</g>
+<g >
+<title>0x50332c (23 samples, 1.63%)</title><rect x="1508.4" y="477" width="25.7" height="15.0" fill="rgb(230,99,28)" rx="2" ry="2" />
+<text  x="1511.37" y="487.5" >0..</text>
+</g>
+<g >
+<title>c10::cuda::CUDAKernelLaunchRegistry::has_failed (1 samples, 0.07%)</title><rect x="1433.5" y="381" width="1.1" height="15.0" fill="rgb(252,132,52)" rx="2" ry="2" />
+<text  x="1436.45" y="391.5" ></text>
+</g>
+<g >
+<title>0xffff05a63c44 (1 samples, 0.07%)</title><rect x="1126.0" y="189" width="1.1" height="15.0" fill="rgb(240,96,39)" rx="2" ry="2" />
+<text  x="1128.95" y="199.5" ></text>
+</g>
+<g >
+<title>0xfffe546c2fc0 (1 samples, 0.07%)</title><rect x="1581.1" y="205" width="1.1" height="15.0" fill="rgb(236,96,35)" rx="2" ry="2" />
+<text  x="1584.05" y="215.5" ></text>
+</g>
+<g >
+<title>PyArray_FromAny (1 samples, 0.07%)</title><rect x="1104.7" y="445" width="1.1" height="15.0" fill="rgb(249,213,49)" rx="2" ry="2" />
+<text  x="1107.71" y="455.5" ></text>
+</g>
+<g >
+<title>$x (3 samples, 0.21%)</title><rect x="1128.2" y="317" width="3.3" height="15.0" fill="rgb(251,113,50)" rx="2" ry="2" />
+<text  x="1131.19" y="327.5" ></text>
+</g>
+<g >
+<title>0xfffe546b4be4 (1 samples, 0.07%)</title><rect x="1128.2" y="205" width="1.1" height="15.0" fill="rgb(247,96,47)" rx="2" ry="2" />
+<text  x="1131.19" y="215.5" ></text>
+</g>
+<g >
+<title>0xfffe546b4c48 (1 samples, 0.07%)</title><rect x="1530.7" y="93" width="1.2" height="15.0" fill="rgb(233,96,31)" rx="2" ry="2" />
+<text  x="1533.74" y="103.5" ></text>
+</g>
+<g >
+<title>transformer_engine::pytorch::getTensorShape (1 samples, 0.07%)</title><rect x="1132.7" y="381" width="1.1" height="15.0" fill="rgb(250,158,49)" rx="2" ry="2" />
+<text  x="1135.66" y="391.5" ></text>
+</g>
+<g >
+<title>0xffffc7176148 (1 samples, 0.07%)</title><rect x="1530.7" y="157" width="1.2" height="15.0" fill="rgb(235,96,33)" rx="2" ry="2" />
+<text  x="1533.74" y="167.5" ></text>
+</g>
+<g >
+<title>cuDevicePrimaryCtxGetState (2 samples, 0.14%)</title><rect x="1142.7" y="365" width="2.3" height="15.0" fill="rgb(245,96,45)" rx="2" ry="2" />
+<text  x="1145.72" y="375.5" ></text>
+</g>
+<g >
+<title>PyEval_SaveThread (1 samples, 0.07%)</title><rect x="1423.4" y="477" width="1.1" height="15.0" fill="rgb(241,201,40)" rx="2" ry="2" />
+<text  x="1426.39" y="487.5" ></text>
+</g>
+<g >
+<title>0xffffe49e2af8 (1 samples, 0.07%)</title><rect x="1159.5" y="429" width="1.1" height="15.0" fill="rgb(240,96,39)" rx="2" ry="2" />
+<text  x="1162.50" y="439.5" ></text>
+</g>
+<g >
+<title>0xfffe546b4be4 (1 samples, 0.07%)</title><rect x="1143.8" y="317" width="1.2" height="15.0" fill="rgb(247,96,47)" rx="2" ry="2" />
+<text  x="1146.84" y="327.5" ></text>
+</g>
+<g >
+<title>std::__cxx11::basic_string&lt;&gt;::_M_create (1 samples, 0.07%)</title><rect x="1514.0" y="381" width="1.1" height="15.0" fill="rgb(245,146,45)" rx="2" ry="2" />
+<text  x="1516.96" y="391.5" ></text>
+</g>
+<g >
+<title>at::native::slice (1 samples, 0.07%)</title><rect x="1439.0" y="221" width="1.2" height="15.0" fill="rgb(246,111,46)" rx="2" ry="2" />
+<text  x="1442.04" y="231.5" ></text>
+</g>
+<g >
+<title>0xffff05ad78d8 (8 samples, 0.57%)</title><rect x="262.7" y="253" width="9.0" height="15.0" fill="rgb(237,96,36)" rx="2" ry="2" />
+<text  x="265.71" y="263.5" ></text>
+</g>
+<g >
+<title>0xffffc7176148 (2 samples, 0.14%)</title><rect x="1546.4" y="349" width="2.2" height="15.0" fill="rgb(235,96,33)" rx="2" ry="2" />
+<text  x="1549.39" y="359.5" ></text>
+</g>
+<g >
+<title>0xffff05ad5440 (1 samples, 0.07%)</title><rect x="1162.9" y="333" width="1.1" height="15.0" fill="rgb(229,96,26)" rx="2" ry="2" />
+<text  x="1165.85" y="343.5" ></text>
+</g>
+<g >
+<title>at::detail::empty_cuda (1 samples, 0.07%)</title><rect x="1528.5" y="253" width="1.1" height="15.0" fill="rgb(235,111,33)" rx="2" ry="2" />
+<text  x="1531.50" y="263.5" ></text>
+</g>
+<g >
+<title>0xfffe546b4dd8 (1 samples, 0.07%)</title><rect x="1456.9" y="397" width="1.2" height="15.0" fill="rgb(240,96,39)" rx="2" ry="2" />
+<text  x="1459.94" y="407.5" ></text>
+</g>
+<g >
+<title>0xffff05ad7a54 (8 samples, 0.57%)</title><rect x="1064.5" y="253" width="8.9" height="15.0" fill="rgb(240,96,39)" rx="2" ry="2" />
+<text  x="1067.45" y="263.5" ></text>
+</g>
+<g >
+<title>0xffff05ad7914 (7 samples, 0.50%)</title><rect x="355.5" y="253" width="7.8" height="15.0" fill="rgb(239,96,38)" rx="2" ry="2" />
+<text  x="358.52" y="263.5" ></text>
+</g>
+<g >
+<title>0xffff05adeaf0 (914 samples, 64.69%)</title><rect x="82.7" y="333" width="1022.0" height="15.0" fill="rgb(237,96,35)" rx="2" ry="2" />
+<text  x="85.68" y="343.5" >0xffff05adeaf0</text>
+</g>
+<g >
+<title>torch::autograd::Engine::thread_init (14 samples, 0.99%)</title><rect x="1544.2" y="445" width="15.6" height="15.0" fill="rgb(236,157,34)" rx="2" ry="2" />
+<text  x="1547.15" y="455.5" ></text>
+</g>
+<g >
+<title>NSYS_OSRT_pthread_cond_wait_1 (3 samples, 0.21%)</title><rect x="1582.2" y="461" width="3.3" height="15.0" fill="rgb(226,119,23)" rx="2" ry="2" />
+<text  x="1585.17" y="471.5" ></text>
+</g>
+<g >
+<title>0xffff05b608b8 (1 samples, 0.07%)</title><rect x="106.2" y="317" width="1.1" height="15.0" fill="rgb(227,96,25)" rx="2" ry="2" />
+<text  x="109.16" y="327.5" ></text>
+</g>
+<g >
+<title>0xffff05c150b0 (1 samples, 0.07%)</title><rect x="1522.9" y="221" width="1.1" height="15.0" fill="rgb(230,96,27)" rx="2" ry="2" />
+<text  x="1525.91" y="231.5" ></text>
+</g>
+<g >
+<title>cudaDeviceSynchronize (914 samples, 64.69%)</title><rect x="82.7" y="429" width="1022.0" height="15.0" fill="rgb(245,109,44)" rx="2" ry="2" />
+<text  x="85.68" y="439.5" >cudaDeviceSynchronize</text>
+</g>
+<g >
+<title>0xffffe49e4ce0 (1 samples, 0.07%)</title><rect x="1111.4" y="365" width="1.1" height="15.0" fill="rgb(236,96,34)" rx="2" ry="2" />
+<text  x="1114.42" y="375.5" ></text>
+</g>
+<g >
+<title>0xffffe58bba0c (3 samples, 0.21%)</title><rect x="24.5" y="477" width="3.4" height="15.0" fill="rgb(234,96,32)" rx="2" ry="2" />
+<text  x="27.54" y="487.5" ></text>
+</g>
+<g >
+<title>0xfffe546b4dd8 (1 samples, 0.07%)</title><rect x="1545.3" y="333" width="1.1" height="15.0" fill="rgb(240,96,39)" rx="2" ry="2" />
+<text  x="1548.27" y="343.5" ></text>
+</g>
+<g >
+<title>std::_Rb_tree&lt;&gt;::erase (1 samples, 0.07%)</title><rect x="1136.0" y="141" width="1.1" height="15.0" fill="rgb(247,146,46)" rx="2" ry="2" />
+<text  x="1139.02" y="151.5" ></text>
+</g>
+<g >
+<title>0xfffe546ba268 (1 samples, 0.07%)</title><rect x="1117.0" y="269" width="1.1" height="15.0" fill="rgb(232,96,29)" rx="2" ry="2" />
+<text  x="1120.01" y="279.5" ></text>
+</g>
+<g >
+<title>0xffff05ae2eb8 (1 samples, 0.07%)</title><rect x="235.9" y="269" width="1.1" height="15.0" fill="rgb(230,96,27)" rx="2" ry="2" />
+<text  x="238.87" y="279.5" ></text>
+</g>
+<g >
+<title>transformer_engine::fused_attn_arbitrary_seqlen_bwd (2 samples, 0.14%)</title><rect x="1519.6" y="381" width="2.2" height="15.0" fill="rgb(243,158,42)" rx="2" ry="2" />
+<text  x="1522.55" y="391.5" ></text>
+</g>
+<g >
+<title>0xffffe585582c (3 samples, 0.21%)</title><rect x="21.2" y="461" width="3.3" height="15.0" fill="rgb(227,96,24)" rx="2" ry="2" />
+<text  x="24.18" y="471.5" ></text>
+</g>
+<g >
+<title>cuCtxGetLimit (1 samples, 0.07%)</title><rect x="1455.8" y="429" width="1.1" height="15.0" fill="rgb(237,100,35)" rx="2" ry="2" />
+<text  x="1458.82" y="439.5" ></text>
+</g>
+<g >
+<title>PyIter_Next (1 samples, 0.07%)</title><rect x="1155.0" y="461" width="1.1" height="15.0" fill="rgb(230,226,27)" rx="2" ry="2" />
+<text  x="1158.02" y="471.5" ></text>
+</g>
+<g >
+<title>$x (14 samples, 0.99%)</title><rect x="1430.1" y="461" width="15.7" height="15.0" fill="rgb(251,113,50)" rx="2" ry="2" />
+<text  x="1433.10" y="471.5" ></text>
+</g>
+<g >
+<title>0xffff05ad7918 (9 samples, 0.64%)</title><rect x="363.3" y="253" width="10.1" height="15.0" fill="rgb(232,96,30)" rx="2" ry="2" />
+<text  x="366.35" y="263.5" ></text>
+</g>
+<g >
+<title>0xffffe59108c4 (1 samples, 0.07%)</title><rect x="24.5" y="317" width="1.2" height="15.0" fill="rgb(245,96,45)" rx="2" ry="2" />
+<text  x="27.54" y="327.5" ></text>
+</g>
+<g >
+<title>$x (4 samples, 0.28%)</title><rect x="1544.2" y="397" width="4.4" height="15.0" fill="rgb(251,113,50)" rx="2" ry="2" />
+<text  x="1547.15" y="407.5" ></text>
+</g>
+<g >
+<title>transformer_engine::fused_attn::fused_attn_arbitrary_seqlen_bwd_impl (2 samples, 0.14%)</title><rect x="1519.6" y="365" width="2.2" height="15.0" fill="rgb(238,158,36)" rx="2" ry="2" />
+<text  x="1522.55" y="375.5" ></text>
+</g>
+<g >
+<title>0xffffe49ecb30 (1 samples, 0.07%)</title><rect x="23.4" y="381" width="1.1" height="15.0" fill="rgb(231,96,29)" rx="2" ry="2" />
+<text  x="26.42" y="391.5" ></text>
+</g>
+<g >
+<title>0xffff05ad7a6c (3 samples, 0.21%)</title><rect x="1091.3" y="253" width="3.3" height="15.0" fill="rgb(227,96,24)" rx="2" ry="2" />
+<text  x="1094.29" y="263.5" ></text>
+</g>
+<g >
+<title>0xffff05ad7938 (7 samples, 0.50%)</title><rect x="498.6" y="253" width="7.9" height="15.0" fill="rgb(230,96,28)" rx="2" ry="2" />
+<text  x="501.65" y="263.5" ></text>
+</g>
+<g >
+<title>PyFrame_GetCode (1 samples, 0.07%)</title><rect x="18.9" y="493" width="1.2" height="15.0" fill="rgb(250,197,49)" rx="2" ry="2" />
+<text  x="21.95" y="503.5" ></text>
+</g>
+<g >
+<title>$x (1 samples, 0.07%)</title><rect x="1530.7" y="205" width="1.2" height="15.0" fill="rgb(251,113,50)" rx="2" ry="2" />
+<text  x="1533.74" y="215.5" ></text>
+</g>
+<g >
+<title>0xffff05a05384 (1 samples, 0.07%)</title><rect x="82.7" y="301" width="1.1" height="15.0" fill="rgb(248,96,47)" rx="2" ry="2" />
+<text  x="85.68" y="311.5" ></text>
+</g>
+<g >
+<title>0xffff05a90be0 (2 samples, 0.14%)</title><rect x="1161.7" y="413" width="2.3" height="15.0" fill="rgb(237,96,35)" rx="2" ry="2" />
+<text  x="1164.73" y="423.5" ></text>
+</g>
+<g >
+<title>0x59aa88 (1 samples, 0.07%)</title><rect x="1505.0" y="493" width="1.1" height="15.0" fill="rgb(242,99,41)" rx="2" ry="2" />
+<text  x="1508.02" y="503.5" ></text>
+</g>
+<g >
+<title>PyObject_Malloc (1 samples, 0.07%)</title><rect x="1426.7" y="477" width="1.2" height="15.0" fill="rgb(238,207,36)" rx="2" ry="2" />
+<text  x="1429.74" y="487.5" ></text>
+</g>
+<g >
+<title>0x515098 (1 samples, 0.07%)</title><rect x="1150.6" y="477" width="1.1" height="15.0" fill="rgb(242,99,41)" rx="2" ry="2" />
+<text  x="1153.55" y="487.5" ></text>
+</g>
+<g >
+<title>0x523834 (3 samples, 0.21%)</title><rect x="1151.7" y="477" width="3.3" height="15.0" fill="rgb(238,99,36)" rx="2" ry="2" />
+<text  x="1154.67" y="487.5" ></text>
+</g>
+<g >
+<title>0xffff05ad7960 (25 samples, 1.77%)</title><rect x="945.9" y="253" width="28.0" height="15.0" fill="rgb(223,96,20)" rx="2" ry="2" />
+<text  x="948.92" y="263.5" >0..</text>
+</g>
+<g >
+<title>at::native::empty_cuda (2 samples, 0.14%)</title><rect x="1129.3" y="285" width="2.2" height="15.0" fill="rgb(235,111,33)" rx="2" ry="2" />
+<text  x="1132.31" y="295.5" ></text>
+</g>
+<g >
+<title>$x (1 samples, 0.07%)</title><rect x="1528.5" y="221" width="1.1" height="15.0" fill="rgb(251,113,50)" rx="2" ry="2" />
+<text  x="1531.50" y="231.5" ></text>
+</g>
+<g >
+<title>0xfffe546c3138 (1 samples, 0.07%)</title><rect x="1546.4" y="237" width="1.1" height="15.0" fill="rgb(236,96,34)" rx="2" ry="2" />
+<text  x="1549.39" y="247.5" ></text>
+</g>
+<g >
+<title>0xfff8e8c00984 (1 samples, 0.07%)</title><rect x="1567.6" y="445" width="1.2" height="15.0" fill="rgb(244,96,43)" rx="2" ry="2" />
+<text  x="1570.64" y="455.5" ></text>
+</g>
+<g >
+<title>$x (1 samples, 0.07%)</title><rect x="1153.9" y="285" width="1.1" height="15.0" fill="rgb(251,113,50)" rx="2" ry="2" />
+<text  x="1156.91" y="295.5" ></text>
+</g>
+<g >
+<title>PyObject_GetAttr (1 samples, 0.07%)</title><rect x="67.0" y="493" width="1.1" height="15.0" fill="rgb(235,207,33)" rx="2" ry="2" />
+<text  x="70.03" y="503.5" ></text>
+</g>
+<g >
+<title>0x56283c (1 samples, 0.07%)</title><rect x="55.8" y="493" width="1.2" height="15.0" fill="rgb(226,99,23)" rx="2" ry="2" />
+<text  x="58.85" y="503.5" ></text>
+</g>
+<g >
+<title>0x4f2694 (1 samples, 0.07%)</title><rect x="36.8" y="493" width="1.2" height="15.0" fill="rgb(245,102,44)" rx="2" ry="2" />
+<text  x="39.84" y="503.5" ></text>
+</g>
+<g >
+<title>$x (1 samples, 0.07%)</title><rect x="1528.5" y="189" width="1.1" height="15.0" fill="rgb(251,113,50)" rx="2" ry="2" />
+<text  x="1531.50" y="199.5" ></text>
+</g>
+<g >
+<title>0x514f54 (2 samples, 0.14%)</title><rect x="49.1" y="493" width="2.3" height="15.0" fill="rgb(237,99,35)" rx="2" ry="2" />
+<text  x="52.14" y="503.5" ></text>
+</g>
+<g >
+<title>0xfffff7fc28f4 (1 samples, 0.07%)</title><rect x="1548.6" y="397" width="1.1" height="15.0" fill="rgb(242,96,41)" rx="2" ry="2" />
+<text  x="1551.63" y="407.5" ></text>
+</g>
+<g >
+<title>0xffff05a018ec (1 samples, 0.07%)</title><rect x="1142.7" y="333" width="1.1" height="15.0" fill="rgb(231,96,29)" rx="2" ry="2" />
+<text  x="1145.72" y="343.5" ></text>
+</g>
+<g >
+<title>0xffff05bbfb28 (18 samples, 1.27%)</title><rect x="203.4" y="285" width="20.2" height="15.0" fill="rgb(236,96,34)" rx="2" ry="2" />
+<text  x="206.45" y="295.5" ></text>
+</g>
+<g >
+<title>0xfffe546ba1ec (1 samples, 0.07%)</title><rect x="1517.3" y="237" width="1.1" height="15.0" fill="rgb(236,96,34)" rx="2" ry="2" />
+<text  x="1520.32" y="247.5" ></text>
+</g>
+<g >
+<title>0xffff05a63c44 (1 samples, 0.07%)</title><rect x="1581.1" y="285" width="1.1" height="15.0" fill="rgb(240,96,39)" rx="2" ry="2" />
+<text  x="1584.05" y="295.5" ></text>
+</g>
+<g >
+<title>torch::autograd::Engine::execute_with_graph_task (1 samples, 0.07%)</title><rect x="1141.6" y="397" width="1.1" height="15.0" fill="rgb(236,157,34)" rx="2" ry="2" />
+<text  x="1144.61" y="407.5" ></text>
+</g>
+<g >
+<title>cudaGetDevice (1 samples, 0.07%)</title><rect x="1126.0" y="237" width="1.1" height="15.0" fill="rgb(246,109,46)" rx="2" ry="2" />
+<text  x="1128.95" y="247.5" ></text>
+</g>
+<g >
+<title>$x (1 samples, 0.07%)</title><rect x="1530.7" y="333" width="1.2" height="15.0" fill="rgb(251,113,50)" rx="2" ry="2" />
+<text  x="1533.74" y="343.5" ></text>
+</g>
+<g >
+<title>0xffff05bbe4c8 (1 samples, 0.07%)</title><rect x="229.2" y="301" width="1.1" height="15.0" fill="rgb(241,96,40)" rx="2" ry="2" />
+<text  x="232.16" y="311.5" ></text>
+</g>
+<g >
+<title>0xffff05a72a68 (914 samples, 64.69%)</title><rect x="82.7" y="365" width="1022.0" height="15.0" fill="rgb(232,96,30)" rx="2" ry="2" />
+<text  x="85.68" y="375.5" >0xffff05a72a68</text>
+</g>
+<g >
+<title>PyObject_Malloc (3 samples, 0.21%)</title><rect x="69.3" y="493" width="3.3" height="15.0" fill="rgb(238,207,36)" rx="2" ry="2" />
+<text  x="72.26" y="503.5" ></text>
+</g>
+<g >
+<title>0xfffe546b4dd8 (1 samples, 0.07%)</title><rect x="1516.2" y="317" width="1.1" height="15.0" fill="rgb(240,96,39)" rx="2" ry="2" />
+<text  x="1519.20" y="327.5" ></text>
+</g>
+<g >
+<title>0xffff05ad78e0 (6 samples, 0.42%)</title><rect x="273.9" y="253" width="6.7" height="15.0" fill="rgb(233,96,31)" rx="2" ry="2" />
+<text  x="276.89" y="263.5" ></text>
+</g>
+<g >
+<title>0xffff05ae2d0c (1 samples, 0.07%)</title><rect x="233.6" y="285" width="1.2" height="15.0" fill="rgb(232,96,29)" rx="2" ry="2" />
+<text  x="236.64" y="295.5" ></text>
+</g>
+<g >
+<title>cudnn::backend::VariantPack::set_internal (1 samples, 0.07%)</title><rect x="1452.5" y="461" width="1.1" height="15.0" fill="rgb(229,109,27)" rx="2" ry="2" />
+<text  x="1455.46" y="471.5" ></text>
+</g>
+<g >
+<title>cuCtxGetDevice_v2 (1 samples, 0.07%)</title><rect x="1441.3" y="381" width="1.1" height="15.0" fill="rgb(238,100,36)" rx="2" ry="2" />
+<text  x="1444.28" y="391.5" ></text>
+</g>
+<g >
+<title>0xfffe546ba434 (1 samples, 0.07%)</title><rect x="1456.9" y="365" width="1.2" height="15.0" fill="rgb(241,96,39)" rx="2" ry="2" />
+<text  x="1459.94" y="375.5" ></text>
+</g>
+<g >
+<title>0x515124 (1 samples, 0.07%)</title><rect x="51.4" y="493" width="1.1" height="15.0" fill="rgb(244,99,43)" rx="2" ry="2" />
+<text  x="54.37" y="503.5" ></text>
+</g>
+<g >
+<title>0xffff05ad7910 (3 samples, 0.21%)</title><rect x="352.2" y="253" width="3.3" height="15.0" fill="rgb(229,96,26)" rx="2" ry="2" />
+<text  x="355.17" y="263.5" ></text>
+</g>
+<g >
+<title>transformer_engine::pytorch::makeTransformerEngineTensor (1 samples, 0.07%)</title><rect x="1529.6" y="397" width="1.1" height="15.0" fill="rgb(242,158,40)" rx="2" ry="2" />
+<text  x="1532.62" y="407.5" ></text>
+</g>
+<g >
+<title>$x (4 samples, 0.28%)</title><rect x="1522.9" y="317" width="4.5" height="15.0" fill="rgb(251,113,50)" rx="2" ry="2" />
+<text  x="1525.91" y="327.5" ></text>
+</g>
+<g >
+<title>torch::empty (2 samples, 0.14%)</title><rect x="1124.8" y="397" width="2.3" height="15.0" fill="rgb(243,157,42)" rx="2" ry="2" />
+<text  x="1127.83" y="407.5" ></text>
+</g>
+<g >
+<title>0xffffe4c8a6f0 (1 samples, 0.07%)</title><rect x="1423.4" y="429" width="1.1" height="15.0" fill="rgb(233,96,31)" rx="2" ry="2" />
+<text  x="1426.39" y="439.5" ></text>
+</g>
+<g >
+<title>0xffff05bbfb18 (1 samples, 0.07%)</title><rect x="191.1" y="285" width="1.2" height="15.0" fill="rgb(237,96,35)" rx="2" ry="2" />
+<text  x="194.15" y="295.5" ></text>
+</g>
+<g >
+<title>(anonymous namespace)::THPFunction_apply (4 samples, 0.28%)</title><rect x="1146.1" y="461" width="4.5" height="15.0" fill="rgb(240,178,39)" rx="2" ry="2" />
+<text  x="1149.08" y="471.5" ></text>
+</g>
+<g >
+<title>at::_ops::empty_memory_format::call (5 samples, 0.35%)</title><rect x="1133.8" y="349" width="5.6" height="15.0" fill="rgb(230,111,28)" rx="2" ry="2" />
+<text  x="1136.78" y="359.5" ></text>
+</g>
+<g >
+<title>0xffffe4c6a064 (1 samples, 0.07%)</title><rect x="1158.4" y="413" width="1.1" height="15.0" fill="rgb(240,96,39)" rx="2" ry="2" />
+<text  x="1161.38" y="423.5" ></text>
+</g>
+<g >
+<title>pybind11::detail::argument_loader&lt;&gt;::call_impl&lt;&gt; (27 samples, 1.91%)</title><rect x="1110.3" y="429" width="30.2" height="15.0" fill="rgb(246,207,45)" rx="2" ry="2" />
+<text  x="1113.30" y="439.5" >py..</text>
+</g>
+<g >
+<title>$x (1 samples, 0.07%)</title><rect x="1126.0" y="301" width="1.1" height="15.0" fill="rgb(251,113,50)" rx="2" ry="2" />
+<text  x="1128.95" y="311.5" ></text>
+</g>
+<g >
+<title>0xfffff7fa0588 (177 samples, 12.53%)</title><rect x="1225.5" y="461" width="197.9" height="15.0" fill="rgb(239,96,38)" rx="2" ry="2" />
+<text  x="1228.47" y="471.5" >0xfffff7fa0588</text>
+</g>
+<g >
+<title>0xffff05a63c7c (1 samples, 0.07%)</title><rect x="1547.5" y="317" width="1.1" height="15.0" fill="rgb(237,96,35)" rx="2" ry="2" />
+<text  x="1550.51" y="327.5" ></text>
+</g>
+<g >
+<title>0xffff87792298 (1 samples, 0.07%)</title><rect x="1527.4" y="269" width="1.1" height="15.0" fill="rgb(240,96,39)" rx="2" ry="2" />
+<text  x="1530.38" y="279.5" ></text>
+</g>
+<g >
+<title>0xfffe546b4dd8 (1 samples, 0.07%)</title><rect x="1143.8" y="333" width="1.2" height="15.0" fill="rgb(240,96,39)" rx="2" ry="2" />
+<text  x="1146.84" y="343.5" ></text>
+</g>
+<g >
+<title>_PyTrash_cond (1 samples, 0.07%)</title><rect x="1588.9" y="493" width="1.1" height="15.0" fill="rgb(252,171,52)" rx="2" ry="2" />
+<text  x="1591.88" y="503.5" ></text>
+</g>
+<g >
+<title>0xffff05ae2e88 (1 samples, 0.07%)</title><rect x="234.8" y="269" width="1.1" height="15.0" fill="rgb(239,96,38)" rx="2" ry="2" />
+<text  x="237.76" y="279.5" ></text>
+</g>
+<g >
+<title>at::detail::empty_cuda (3 samples, 0.21%)</title><rect x="1524.0" y="253" width="3.4" height="15.0" fill="rgb(235,111,33)" rx="2" ry="2" />
+<text  x="1527.03" y="263.5" ></text>
+</g>
+<g >
+<title>0xffff05ad78e8 (11 samples, 0.78%)</title><rect x="291.8" y="253" width="12.3" height="15.0" fill="rgb(236,96,34)" rx="2" ry="2" />
+<text  x="294.78" y="263.5" ></text>
+</g>
+<g >
+<title>0xffffe49e4e0c (1 samples, 0.07%)</title><rect x="1112.5" y="365" width="1.2" height="15.0" fill="rgb(231,96,29)" rx="2" ry="2" />
+<text  x="1115.53" y="375.5" ></text>
+</g>
+<g >
+<title>pybind11::detail::type_caster_generic::type_caster_generic (1 samples, 0.07%)</title><rect x="1533.0" y="413" width="1.1" height="15.0" fill="rgb(228,207,25)" rx="2" ry="2" />
+<text  x="1535.97" y="423.5" ></text>
+</g>
+<g >
+<title>at::ThreadLocalState::setThreadLocalState (2 samples, 0.14%)</title><rect x="1552.0" y="413" width="2.2" height="15.0" fill="rgb(245,111,45)" rx="2" ry="2" />
+<text  x="1554.98" y="423.5" ></text>
+</g>
+<g >
+<title>thread: main (1,318 samples, 93.28%)</title><rect x="27.9" y="509" width="1473.8" height="15.0" fill="rgb(247,137,46)" rx="2" ry="2" />
+<text  x="30.89" y="519.5" >thread: main</text>
+</g>
+<g >
+<title>0xffffe462b8ec (1 samples, 0.07%)</title><rect x="24.5" y="349" width="1.2" height="15.0" fill="rgb(231,96,29)" rx="2" ry="2" />
+<text  x="27.54" y="359.5" ></text>
+</g>
+<g >
+<title>PyCode_Addr2Line (8 samples, 0.57%)</title><rect x="10.0" y="493" width="8.9" height="15.0" fill="rgb(246,207,46)" rx="2" ry="2" />
+<text  x="13.00" y="503.5" ></text>
+</g>
+<g >
+<title>PyObject_RichCompare (1 samples, 0.07%)</title><rect x="1427.9" y="477" width="1.1" height="15.0" fill="rgb(248,207,47)" rx="2" ry="2" />
+<text  x="1430.86" y="487.5" ></text>
+</g>
+<g >
+<title>transformer_engine::pytorch::init_extension (1 samples, 0.07%)</title><rect x="1131.5" y="365" width="1.2" height="15.0" fill="rgb(247,158,46)" rx="2" ry="2" />
+<text  x="1134.54" y="375.5" ></text>
+</g>
+<g >
+<title>c10::cuda::SetDevice (1 samples, 0.07%)</title><rect x="1441.3" y="429" width="1.1" height="15.0" fill="rgb(246,132,46)" rx="2" ry="2" />
+<text  x="1444.28" y="439.5" ></text>
+</g>
+<g >
+<title>PyUnicode_AsUTF8 (1 samples, 0.07%)</title><rect x="74.9" y="493" width="1.1" height="15.0" fill="rgb(240,226,38)" rx="2" ry="2" />
+<text  x="77.85" y="503.5" ></text>
+</g>
+<g >
+<title>0x5172a8 (1 samples, 0.07%)</title><rect x="53.6" y="493" width="1.1" height="15.0" fill="rgb(233,99,31)" rx="2" ry="2" />
+<text  x="56.61" y="503.5" ></text>
+</g>
+<g >
+<title>0xffffe4bc2c28 (1 samples, 0.07%)</title><rect x="1536.3" y="461" width="1.1" height="15.0" fill="rgb(235,96,33)" rx="2" ry="2" />
+<text  x="1539.33" y="471.5" ></text>
+</g>
+<g >
+<title>cudaGetDevice (1 samples, 0.07%)</title><rect x="1524.0" y="189" width="1.1" height="15.0" fill="rgb(246,109,46)" rx="2" ry="2" />
+<text  x="1527.03" y="199.5" ></text>
+</g>
+<g >
+<title>0xfffe546ba268 (1 samples, 0.07%)</title><rect x="1581.1" y="221" width="1.1" height="15.0" fill="rgb(232,96,29)" rx="2" ry="2" />
+<text  x="1584.05" y="231.5" ></text>
+</g>
+<g >
+<title>cudnn_frontend::graph::Graph::execute_plan_at_index (1 samples, 0.07%)</title><rect x="1120.4" y="349" width="1.1" height="15.0" fill="rgb(250,109,49)" rx="2" ry="2" />
+<text  x="1123.36" y="359.5" ></text>
+</g>
+<g >
+<title>__clock_gettime (2 samples, 0.14%)</title><rect x="84.9" y="285" width="2.3" height="15.0" fill="rgb(236,144,34)" rx="2" ry="2" />
+<text  x="87.92" y="295.5" ></text>
+</g>
+<g >
+<title>$x (1 samples, 0.07%)</title><rect x="1151.7" y="413" width="1.1" height="15.0" fill="rgb(251,113,50)" rx="2" ry="2" />
+<text  x="1154.67" y="423.5" ></text>
+</g>
+<g >
+<title>transformer_engine::detail::HandleManager&lt;&gt;::GetHandle (3 samples, 0.21%)</title><rect x="1515.1" y="381" width="3.3" height="15.0" fill="rgb(240,158,39)" rx="2" ry="2" />
+<text  x="1518.08" y="391.5" ></text>
+</g>
+<g >
+<title>0xffffe49e2d08 (1 samples, 0.07%)</title><rect x="1159.5" y="445" width="1.1" height="15.0" fill="rgb(237,96,35)" rx="2" ry="2" />
+<text  x="1162.50" y="455.5" ></text>
+</g>
+<g >
+<title>transformer_engine::fused_attn::get_graph&lt;&gt; (1 samples, 0.07%)</title><rect x="1121.5" y="349" width="1.1" height="15.0" fill="rgb(240,158,38)" rx="2" ry="2" />
+<text  x="1124.48" y="359.5" ></text>
+</g>
+<g >
+<title>$x (1 samples, 0.07%)</title><rect x="1130.4" y="221" width="1.1" height="15.0" fill="rgb(251,113,50)" rx="2" ry="2" />
+<text  x="1133.42" y="231.5" ></text>
+</g>
+<g >
+<title>0x4d0b08 (1 samples, 0.07%)</title><rect x="33.5" y="493" width="1.1" height="15.0" fill="rgb(238,102,37)" rx="2" ry="2" />
+<text  x="36.48" y="503.5" ></text>
+</g>
+<g >
+<title>PyUFunc_ReduceWrapper (1 samples, 0.07%)</title><rect x="1105.8" y="445" width="1.1" height="15.0" fill="rgb(243,226,41)" rx="2" ry="2" />
+<text  x="1108.82" y="455.5" ></text>
+</g>
+<g >
+<title>array_dealloc (1 samples, 0.07%)</title><rect x="1106.9" y="445" width="1.2" height="15.0" fill="rgb(238,134,36)" rx="2" ry="2" />
+<text  x="1109.94" y="455.5" ></text>
+</g>
+<g >
+<title>NSYS_OSRT_pthread_mutex_lock_1 (1 samples, 0.07%)</title><rect x="1151.7" y="365" width="1.1" height="15.0" fill="rgb(223,119,20)" rx="2" ry="2" />
+<text  x="1154.67" y="375.5" ></text>
+</g>
+<g >
+<title>0xfff8e8c015fc (1 samples, 0.07%)</title><rect x="1458.1" y="445" width="1.1" height="15.0" fill="rgb(232,96,30)" rx="2" ry="2" />
+<text  x="1461.05" y="455.5" ></text>
+</g>
+<g >
+<title>0xffff05ad792c (5 samples, 0.35%)</title><rect x="486.3" y="253" width="5.6" height="15.0" fill="rgb(226,96,23)" rx="2" ry="2" />
+<text  x="489.35" y="263.5" ></text>
+</g>
+<g >
+<title>0xfffe545df078 (1 samples, 0.07%)</title><rect x="1517.3" y="221" width="1.1" height="15.0" fill="rgb(244,96,43)" rx="2" ry="2" />
+<text  x="1520.32" y="231.5" ></text>
+</g>
+<g >
+<title>$x (1 samples, 0.07%)</title><rect x="1146.1" y="429" width="1.1" height="15.0" fill="rgb(251,113,50)" rx="2" ry="2" />
+<text  x="1149.08" y="439.5" ></text>
+</g>
+<g >
+<title>0xffffe4bb66a4 (3 samples, 0.21%)</title><rect x="21.2" y="429" width="3.3" height="15.0" fill="rgb(237,96,35)" rx="2" ry="2" />
+<text  x="24.18" y="439.5" ></text>
+</g>
+<g >
+<title>0xffffe49dfd78 (1 samples, 0.07%)</title><rect x="1444.6" y="397" width="1.2" height="15.0" fill="rgb(241,96,40)" rx="2" ry="2" />
+<text  x="1447.64" y="407.5" ></text>
+</g>
+<g >
+<title>c10::cuda::MaybeSetDevice (1 samples, 0.07%)</title><rect x="1557.6" y="381" width="1.1" height="15.0" fill="rgb(246,132,46)" rx="2" ry="2" />
+<text  x="1560.57" y="391.5" ></text>
+</g>
+<g >
+<title>c10::cuda::GetDevice (1 samples, 0.07%)</title><rect x="1129.3" y="205" width="1.1" height="15.0" fill="rgb(246,132,46)" rx="2" ry="2" />
+<text  x="1132.31" y="215.5" ></text>
+</g>
+<g >
+<title>0xffffe49e3c24 (1 samples, 0.07%)</title><rect x="1512.8" y="381" width="1.2" height="15.0" fill="rgb(242,96,41)" rx="2" ry="2" />
+<text  x="1515.85" y="391.5" ></text>
+</g>
+<g >
+<title>0xffff05bbf090 (1 samples, 0.07%)</title><rect x="128.5" y="285" width="1.1" height="15.0" fill="rgb(238,96,37)" rx="2" ry="2" />
+<text  x="131.53" y="295.5" ></text>
+</g>
+<g >
+<title>0xffff05ae2ed4 (1 samples, 0.07%)</title><rect x="237.0" y="269" width="1.1" height="15.0" fill="rgb(246,96,46)" rx="2" ry="2" />
+<text  x="239.99" y="279.5" ></text>
+</g>
+<g >
+<title>cudaGetDevice (1 samples, 0.07%)</title><rect x="1581.1" y="333" width="1.1" height="15.0" fill="rgb(246,109,46)" rx="2" ry="2" />
+<text  x="1584.05" y="343.5" ></text>
+</g>
+<g >
+<title>0xfffff7fa0840 (1 samples, 0.07%)</title><rect x="86.0" y="269" width="1.2" height="15.0" fill="rgb(226,96,23)" rx="2" ry="2" />
+<text  x="89.04" y="279.5" ></text>
+</g>
+<g >
+<title>0x4f5170 (1 samples, 0.07%)</title><rect x="40.2" y="493" width="1.1" height="15.0" fill="rgb(240,102,38)" rx="2" ry="2" />
+<text  x="43.19" y="503.5" ></text>
+</g>
+<g >
+<title>0xffffe4aa9898 (1 samples, 0.07%)</title><rect x="1582.2" y="445" width="1.1" height="15.0" fill="rgb(236,96,34)" rx="2" ry="2" />
+<text  x="1585.17" y="455.5" ></text>
+</g>
+<g >
+<title>0xfffe546c2d9c (1 samples, 0.07%)</title><rect x="1572.1" y="317" width="1.1" height="15.0" fill="rgb(234,96,32)" rx="2" ry="2" />
+<text  x="1575.11" y="327.5" ></text>
+</g>
+<g >
+<title>0xfffff7fc2904 (1 samples, 0.07%)</title><rect x="1549.7" y="397" width="1.2" height="15.0" fill="rgb(240,96,39)" rx="2" ry="2" />
+<text  x="1552.75" y="407.5" ></text>
+</g>
+<g >
+<title>0xfff8e8c0036c (1 samples, 0.07%)</title><rect x="1569.9" y="461" width="1.1" height="15.0" fill="rgb(226,96,23)" rx="2" ry="2" />
+<text  x="1572.87" y="471.5" ></text>
+</g>
+<g >
+<title>c10::TensorImpl::~TensorImpl (1 samples, 0.07%)</title><rect x="1508.4" y="397" width="1.1" height="15.0" fill="rgb(238,132,36)" rx="2" ry="2" />
+<text  x="1511.37" y="407.5" ></text>
+</g>
+<g >
+<title>$x (1 samples, 0.07%)</title><rect x="1440.2" y="413" width="1.1" height="15.0" fill="rgb(251,113,50)" rx="2" ry="2" />
+<text  x="1443.16" y="423.5" ></text>
+</g>
+<g >
+<title>NSYS_OSRT_pthread_rwlock_rdlock_1 (1 samples, 0.07%)</title><rect x="1524.0" y="157" width="1.1" height="15.0" fill="rgb(223,119,20)" rx="2" ry="2" />
+<text  x="1527.03" y="167.5" ></text>
+</g>
+<g >
+<title>at::_ops::empty_memory_format::call (2 samples, 0.14%)</title><rect x="1527.4" y="365" width="2.2" height="15.0" fill="rgb(230,111,28)" rx="2" ry="2" />
+<text  x="1530.38" y="375.5" ></text>
+</g>
+<g >
+<title>0xffff05bbf088 (1 samples, 0.07%)</title><rect x="126.3" y="285" width="1.1" height="15.0" fill="rgb(243,96,42)" rx="2" ry="2" />
+<text  x="129.29" y="295.5" ></text>
+</g>
+<g >
+<title>$x (1 samples, 0.07%)</title><rect x="1136.0" y="173" width="1.1" height="15.0" fill="rgb(251,113,50)" rx="2" ry="2" />
+<text  x="1139.02" y="183.5" ></text>
+</g>
+<g >
+<title>0xfff8e8c06e40 (1 samples, 0.07%)</title><rect x="1576.6" y="397" width="1.1" height="15.0" fill="rgb(228,96,26)" rx="2" ry="2" />
+<text  x="1579.58" y="407.5" ></text>
+</g>
+<g >
+<title>0xffffe4c993c8 (1 samples, 0.07%)</title><rect x="1572.1" y="269" width="1.1" height="15.0" fill="rgb(242,96,41)" rx="2" ry="2" />
+<text  x="1575.11" y="279.5" ></text>
+</g>
+<g >
+<title>0xffff05b785c0 (1 samples, 0.07%)</title><rect x="1162.9" y="285" width="1.1" height="15.0" fill="rgb(237,96,35)" rx="2" ry="2" />
+<text  x="1165.85" y="295.5" ></text>
+</g>
+<g >
+<title>0xffff05ad7948 (2 samples, 0.14%)</title><rect x="516.5" y="253" width="2.3" height="15.0" fill="rgb(229,96,26)" rx="2" ry="2" />
+<text  x="519.54" y="263.5" ></text>
+</g>
+<g >
+<title>$x (1 samples, 0.07%)</title><rect x="1153.9" y="365" width="1.1" height="15.0" fill="rgb(251,113,50)" rx="2" ry="2" />
+<text  x="1156.91" y="375.5" ></text>
+</g>
+<g >
+<title>0xffffc7176148 (1 samples, 0.07%)</title><rect x="1555.3" y="333" width="1.2" height="15.0" fill="rgb(235,96,33)" rx="2" ry="2" />
+<text  x="1558.34" y="343.5" ></text>
+</g>
+<g >
+<title>0xffffd8054c6c (1 samples, 0.07%)</title><rect x="22.3" y="413" width="1.1" height="15.0" fill="rgb(226,96,23)" rx="2" ry="2" />
+<text  x="25.30" y="423.5" ></text>
+</g>
+<g >
+<title>__libc_malloc (1 samples, 0.07%)</title><rect x="1460.3" y="461" width="1.1" height="15.0" fill="rgb(238,154,36)" rx="2" ry="2" />
+<text  x="1463.29" y="471.5" ></text>
+</g>
+<g >
+<title>0xfffe708be45c (1 samples, 0.07%)</title><rect x="80.4" y="381" width="1.2" height="15.0" fill="rgb(226,96,23)" rx="2" ry="2" />
+<text  x="83.45" y="391.5" ></text>
+</g>
+<g >
+<title>0xfff8e8c055c0 (1 samples, 0.07%)</title><rect x="1572.1" y="461" width="1.1" height="15.0" fill="rgb(237,96,35)" rx="2" ry="2" />
+<text  x="1575.11" y="471.5" ></text>
+</g>
+<g >
+<title>at::detail::empty_cuda (4 samples, 0.28%)</title><rect x="1134.9" y="253" width="4.5" height="15.0" fill="rgb(235,111,33)" rx="2" ry="2" />
+<text  x="1137.90" y="263.5" ></text>
+</g>
+<g >
+<title>c10::cuda::GetDevice (1 samples, 0.07%)</title><rect x="1139.4" y="349" width="1.1" height="15.0" fill="rgb(246,132,46)" rx="2" ry="2" />
+<text  x="1142.37" y="359.5" ></text>
+</g>
+<g >
+<title>$x (2 samples, 0.14%)</title><rect x="1527.4" y="317" width="2.2" height="15.0" fill="rgb(251,113,50)" rx="2" ry="2" />
+<text  x="1530.38" y="327.5" ></text>
+</g>
+<g >
+<title>0xfffe546c3580 (1 samples, 0.07%)</title><rect x="1516.2" y="253" width="1.1" height="15.0" fill="rgb(236,96,34)" rx="2" ry="2" />
+<text  x="1519.20" y="263.5" ></text>
+</g>
+<g >
+<title>0xffff05ad7934 (2 samples, 0.14%)</title><rect x="496.4" y="253" width="2.2" height="15.0" fill="rgb(237,96,35)" rx="2" ry="2" />
+<text  x="499.41" y="263.5" ></text>
+</g>
+<g >
+<title>0xfffe546b4be4 (1 samples, 0.07%)</title><rect x="1516.2" y="301" width="1.1" height="15.0" fill="rgb(247,96,47)" rx="2" ry="2" />
+<text  x="1519.20" y="311.5" ></text>
+</g>
+<g >
+<title>0xfffe546bf844 (2 samples, 0.14%)</title><rect x="1540.8" y="301" width="2.2" height="15.0" fill="rgb(237,96,35)" rx="2" ry="2" />
+<text  x="1543.80" y="311.5" ></text>
+</g>
+<g >
+<title>0xffff05ad5108 (1 samples, 0.07%)</title><rect x="1162.9" y="317" width="1.1" height="15.0" fill="rgb(239,96,37)" rx="2" ry="2" />
+<text  x="1165.85" y="327.5" ></text>
+</g>
+<g >
+<title>cudnn::ops::SetStream (1 samples, 0.07%)</title><rect x="1578.8" y="477" width="1.1" height="15.0" fill="rgb(225,109,23)" rx="2" ry="2" />
+<text  x="1581.82" y="487.5" ></text>
+</g>
+<g >
+<title>0xfffe546b4be4 (1 samples, 0.07%)</title><rect x="1545.3" y="317" width="1.1" height="15.0" fill="rgb(247,96,47)" rx="2" ry="2" />
+<text  x="1548.27" y="327.5" ></text>
+</g>
+<g >
+<title>0xfffff7fa0548 (2 samples, 0.14%)</title><rect x="1164.0" y="461" width="2.2" height="15.0" fill="rgb(232,96,30)" rx="2" ry="2" />
+<text  x="1166.97" y="471.5" ></text>
+</g>
+<g >
+<title>0xfffe546ba434 (1 samples, 0.07%)</title><rect x="1117.0" y="285" width="1.1" height="15.0" fill="rgb(241,96,39)" rx="2" ry="2" />
+<text  x="1120.01" y="295.5" ></text>
+</g>
+<g >
+<title>0x4cbb00 (1 samples, 0.07%)</title><rect x="1429.0" y="461" width="1.1" height="15.0" fill="rgb(235,102,33)" rx="2" ry="2" />
+<text  x="1431.98" y="471.5" ></text>
+</g>
+<g >
+<title>0x515578 (1 samples, 0.07%)</title><rect x="52.5" y="493" width="1.1" height="15.0" fill="rgb(241,99,39)" rx="2" ry="2" />
+<text  x="55.49" y="503.5" ></text>
+</g>
+<g >
+<title>at::indexing::impl::applySlice (3 samples, 0.21%)</title><rect x="1436.8" y="429" width="3.4" height="15.0" fill="rgb(246,111,46)" rx="2" ry="2" />
+<text  x="1439.81" y="439.5" ></text>
+</g>
+<g >
+<title>nvte_get_fused_attn_backend_v2 (1 samples, 0.07%)</title><rect x="1113.7" y="381" width="1.1" height="15.0" fill="rgb(238,163,36)" rx="2" ry="2" />
+<text  x="1116.65" y="391.5" ></text>
+</g>
+<g >
+<title>c10::cuda::ExchangeDevice (4 samples, 0.28%)</title><rect x="1432.3" y="413" width="4.5" height="15.0" fill="rgb(246,132,46)" rx="2" ry="2" />
+<text  x="1435.34" y="423.5" ></text>
+</g>
+<g >
+<title>0xffff05bf87e4 (1 samples, 0.07%)</title><rect x="1121.5" y="269" width="1.1" height="15.0" fill="rgb(244,96,43)" rx="2" ry="2" />
+<text  x="1124.48" y="279.5" ></text>
+</g>
+<g >
+<title>0x50ad4c (1 samples, 0.07%)</title><rect x="45.8" y="493" width="1.1" height="15.0" fill="rgb(227,99,25)" rx="2" ry="2" />
+<text  x="48.78" y="503.5" ></text>
+</g>
+<g >
+<title>0xfffe546b4dd8 (1 samples, 0.07%)</title><rect x="1522.9" y="205" width="1.1" height="15.0" fill="rgb(240,96,39)" rx="2" ry="2" />
+<text  x="1525.91" y="215.5" ></text>
+</g>
+<g >
+<title>0xffffc7176148 (1 samples, 0.07%)</title><rect x="1114.8" y="333" width="1.1" height="15.0" fill="rgb(235,96,33)" rx="2" ry="2" />
+<text  x="1117.77" y="343.5" ></text>
+</g>
+<g >
+<title>at::_ops::empty_memory_format::redispatch (5 samples, 0.35%)</title><rect x="1133.8" y="317" width="5.6" height="15.0" fill="rgb(242,111,41)" rx="2" ry="2" />
+<text  x="1136.78" y="327.5" ></text>
+</g>
+<g >
+<title>$x (1 samples, 0.07%)</title><rect x="1151.7" y="397" width="1.1" height="15.0" fill="rgb(251,113,50)" rx="2" ry="2" />
+<text  x="1154.67" y="407.5" ></text>
+</g>
+<g >
+<title>0xffff05a63c7c (1 samples, 0.07%)</title><rect x="1530.7" y="125" width="1.2" height="15.0" fill="rgb(237,96,35)" rx="2" ry="2" />
+<text  x="1533.74" y="135.5" ></text>
+</g>
+<g >
+<title>$x (1 samples, 0.07%)</title><rect x="1128.2" y="285" width="1.1" height="15.0" fill="rgb(251,113,50)" rx="2" ry="2" />
+<text  x="1131.19" y="295.5" ></text>
+</g>
+<g >
+<title>at::detail::empty_cuda (4 samples, 0.28%)</title><rect x="1134.9" y="237" width="4.5" height="15.0" fill="rgb(235,111,33)" rx="2" ry="2" />
+<text  x="1137.90" y="247.5" ></text>
+</g>
+<g >
+<title>0xffff05ad7930 (4 samples, 0.28%)</title><rect x="491.9" y="253" width="4.5" height="15.0" fill="rgb(227,96,24)" rx="2" ry="2" />
+<text  x="494.94" y="263.5" ></text>
+</g>
+<g >
+<title>0xffff05a6425c (1 samples, 0.07%)</title><rect x="1115.9" y="333" width="1.1" height="15.0" fill="rgb(228,96,25)" rx="2" ry="2" />
+<text  x="1118.89" y="343.5" ></text>
+</g>
+<g >
+<title>PyThreadState_GetFrame (1 samples, 0.07%)</title><rect x="21.2" y="397" width="1.1" height="15.0" fill="rgb(241,230,40)" rx="2" ry="2" />
+<text  x="24.18" y="407.5" ></text>
+</g>
+<g >
+<title>pthread_cond_wait (1 samples, 0.07%)</title><rect x="1584.4" y="445" width="1.1" height="15.0" fill="rgb(237,158,35)" rx="2" ry="2" />
+<text  x="1587.41" y="455.5" ></text>
+</g>
+<g >
+<title>0xffff05ad7964 (13 samples, 0.92%)</title><rect x="973.9" y="253" width="14.5" height="15.0" fill="rgb(234,96,32)" rx="2" ry="2" />
+<text  x="976.88" y="263.5" ></text>
+</g>
+<g >
+<title>0xffffc7176148 (1 samples, 0.07%)</title><rect x="1517.3" y="333" width="1.1" height="15.0" fill="rgb(235,96,33)" rx="2" ry="2" />
+<text  x="1520.32" y="343.5" ></text>
+</g>
+<g >
+<title>cuCtxGetDevice_v2 (1 samples, 0.07%)</title><rect x="1530.7" y="141" width="1.2" height="15.0" fill="rgb(238,100,36)" rx="2" ry="2" />
+<text  x="1533.74" y="151.5" ></text>
+</g>
+<g >
+<title>0xffff05ad7a80 (1 samples, 0.07%)</title><rect x="1095.8" y="253" width="1.1" height="15.0" fill="rgb(239,96,37)" rx="2" ry="2" />
+<text  x="1098.76" y="263.5" ></text>
+</g>
+<g >
+<title>pybind11::cpp_function::initialize&lt;&gt;::{lambda()#1}::operator() (23 samples, 1.63%)</title><rect x="1508.4" y="445" width="25.7" height="15.0" fill="rgb(241,207,40)" rx="2" ry="2" />
+<text  x="1511.37" y="455.5" >p..</text>
+</g>
+<g >
+<title>at::detail::empty_generic (1 samples, 0.07%)</title><rect x="1130.4" y="237" width="1.1" height="15.0" fill="rgb(228,111,25)" rx="2" ry="2" />
+<text  x="1133.42" y="247.5" ></text>
+</g>
+<g >
+<title>0xffff05ad7904 (14 samples, 0.99%)</title><rect x="330.9" y="253" width="15.7" height="15.0" fill="rgb(240,96,39)" rx="2" ry="2" />
+<text  x="333.92" y="263.5" ></text>
+</g>
+<g >
+<title>0xffff05a63c44 (1 samples, 0.07%)</title><rect x="1139.4" y="285" width="1.1" height="15.0" fill="rgb(240,96,39)" rx="2" ry="2" />
+<text  x="1142.37" y="295.5" ></text>
+</g>
+<g >
+<title>0xffff05a91150 (2 samples, 0.14%)</title><rect x="1161.7" y="397" width="2.3" height="15.0" fill="rgb(230,96,28)" rx="2" ry="2" />
+<text  x="1164.73" y="407.5" ></text>
+</g>
+<g >
+<title>0xfffe546ba434 (1 samples, 0.07%)</title><rect x="1114.8" y="253" width="1.1" height="15.0" fill="rgb(241,96,39)" rx="2" ry="2" />
+<text  x="1117.77" y="263.5" ></text>
+</g>
+<g >
+<title>std::__cxx11::basic_string&lt;&gt;::_M_construct&lt;&gt; (1 samples, 0.07%)</title><rect x="1120.4" y="301" width="1.1" height="15.0" fill="rgb(240,146,38)" rx="2" ry="2" />
+<text  x="1123.36" y="311.5" ></text>
+</g>
+<g >
+<title>0xffffe4c6eb78 (2 samples, 0.14%)</title><rect x="25.7" y="349" width="2.2" height="15.0" fill="rgb(243,96,41)" rx="2" ry="2" />
+<text  x="28.65" y="359.5" ></text>
+</g>
+<g >
+<title>0x509c64 (1 samples, 0.07%)</title><rect x="1502.8" y="493" width="1.1" height="15.0" fill="rgb(238,99,36)" rx="2" ry="2" />
+<text  x="1505.78" y="503.5" ></text>
+</g>
+<g >
+<title>0xfffe546ba268 (2 samples, 0.14%)</title><rect x="1540.8" y="317" width="2.2" height="15.0" fill="rgb(232,96,29)" rx="2" ry="2" />
+<text  x="1543.80" y="327.5" ></text>
+</g>
+<g >
+<title>0xffff05bbe67c (778 samples, 55.06%)</title><rect x="232.5" y="301" width="870.0" height="15.0" fill="rgb(235,96,33)" rx="2" ry="2" />
+<text  x="235.52" y="311.5" >0xffff05bbe67c</text>
+</g>
+<g >
+<title>transformer_engine::typeToNumBits (1 samples, 0.07%)</title><rect x="1122.6" y="349" width="1.1" height="15.0" fill="rgb(233,158,31)" rx="2" ry="2" />
+<text  x="1125.60" y="359.5" ></text>
+</g>
+<g >
+<title>0xffff05adf504 (1 samples, 0.07%)</title><rect x="1518.4" y="301" width="1.2" height="15.0" fill="rgb(243,96,42)" rx="2" ry="2" />
+<text  x="1521.44" y="311.5" ></text>
+</g>
+<g >
+<title>0xfffe546ba434 (1 samples, 0.07%)</title><rect x="1517.3" y="253" width="1.1" height="15.0" fill="rgb(241,96,39)" rx="2" ry="2" />
+<text  x="1520.32" y="263.5" ></text>
+</g>
+<g >
+<title>0xffff05bbe540 (1 samples, 0.07%)</title><rect x="230.3" y="301" width="1.1" height="15.0" fill="rgb(228,96,26)" rx="2" ry="2" />
+<text  x="233.28" y="311.5" ></text>
+</g>
+<g >
+<title>__libc_free (1 samples, 0.07%)</title><rect x="1109.2" y="429" width="1.1" height="15.0" fill="rgb(246,154,46)" rx="2" ry="2" />
+<text  x="1112.18" y="439.5" ></text>
+</g>
+<g >
+<title>PyObject_Call (1 samples, 0.07%)</title><rect x="1425.6" y="477" width="1.1" height="15.0" fill="rgb(230,207,28)" rx="2" ry="2" />
+<text  x="1428.63" y="487.5" ></text>
+</g>
+<g >
+<title>c10::TensorImpl::copy_tensor_metadata_except_version_counter (1 samples, 0.07%)</title><rect x="1560.9" y="381" width="1.1" height="15.0" fill="rgb(240,132,38)" rx="2" ry="2" />
+<text  x="1563.93" y="391.5" ></text>
+</g>
+<g >
+<title>0xffffc428d080 (1 samples, 0.07%)</title><rect x="1563.2" y="397" width="1.1" height="15.0" fill="rgb(239,96,38)" rx="2" ry="2" />
+<text  x="1566.16" y="407.5" ></text>
+</g>
+<g >
+<title>0xfffe546b4be4 (1 samples, 0.07%)</title><rect x="1555.3" y="269" width="1.2" height="15.0" fill="rgb(247,96,47)" rx="2" ry="2" />
+<text  x="1558.34" y="279.5" ></text>
+</g>
+<g >
+<title>0xfffff7fa0574 (1 samples, 0.07%)</title><rect x="1179.6" y="461" width="1.1" height="15.0" fill="rgb(248,96,47)" rx="2" ry="2" />
+<text  x="1182.62" y="471.5" ></text>
+</g>
+<g >
+<title>0xffff05bbfb14 (1 samples, 0.07%)</title><rect x="190.0" y="285" width="1.1" height="15.0" fill="rgb(244,96,43)" rx="2" ry="2" />
+<text  x="193.03" y="295.5" ></text>
+</g>
+<g >
+<title>transformer_engine::pytorch::convert_quantizer (1 samples, 0.07%)</title><rect x="1131.5" y="381" width="1.2" height="15.0" fill="rgb(244,158,43)" rx="2" ry="2" />
+<text  x="1134.54" y="391.5" ></text>
+</g>
+<g >
+<title>0xffffe4c6dc0c (1 samples, 0.07%)</title><rect x="25.7" y="333" width="1.1" height="15.0" fill="rgb(232,96,30)" rx="2" ry="2" />
+<text  x="28.65" y="343.5" ></text>
+</g>
+<g >
+<title>0x5a4020 (1 samples, 0.07%)</title><rect x="1159.5" y="477" width="1.1" height="15.0" fill="rgb(234,99,32)" rx="2" ry="2" />
+<text  x="1162.50" y="487.5" ></text>
+</g>
+<g >
+<title>PyObject_Malloc (1 samples, 0.07%)</title><rect x="20.1" y="493" width="1.1" height="15.0" fill="rgb(238,207,36)" rx="2" ry="2" />
+<text  x="23.06" y="503.5" ></text>
+</g>
+<g >
+<title>PyArray_FromAny_int (1 samples, 0.07%)</title><rect x="1104.7" y="429" width="1.1" height="15.0" fill="rgb(238,213,36)" rx="2" ry="2" />
+<text  x="1107.71" y="439.5" ></text>
+</g>
+<g >
+<title>$x (2 samples, 0.14%)</title><rect x="1140.5" y="413" width="2.2" height="15.0" fill="rgb(251,113,50)" rx="2" ry="2" />
+<text  x="1143.49" y="423.5" ></text>
+</g>
+<g >
+<title>0xffffe4aa9590 (1 samples, 0.07%)</title><rect x="1141.6" y="365" width="1.1" height="15.0" fill="rgb(235,96,33)" rx="2" ry="2" />
+<text  x="1144.61" y="375.5" ></text>
+</g>
+<g >
+<title>0xfff8e8ce7db8 (1 samples, 0.07%)</title><rect x="1572.1" y="413" width="1.1" height="15.0" fill="rgb(230,96,28)" rx="2" ry="2" />
+<text  x="1575.11" y="423.5" ></text>
+</g>
+<g >
+<title>0xfff8e8c071f0 (1 samples, 0.07%)</title><rect x="1572.1" y="445" width="1.1" height="15.0" fill="rgb(237,96,35)" rx="2" ry="2" />
+<text  x="1575.11" y="455.5" ></text>
+</g>
+<g >
+<title>_PyType_GetDict (1 samples, 0.07%)</title><rect x="1451.3" y="461" width="1.2" height="15.0" fill="rgb(238,171,36)" rx="2" ry="2" />
+<text  x="1454.34" y="471.5" ></text>
+</g>
+<g >
+<title>pybind11::detail::argument_loader&lt;&gt;::call_impl&lt;&gt; (22 samples, 1.56%)</title><rect x="1508.4" y="429" width="24.6" height="15.0" fill="rgb(246,207,45)" rx="2" ry="2" />
+<text  x="1511.37" y="439.5" >p..</text>
+</g>
+<g >
+<title>__pthread_mutex_trylock (1 samples, 0.07%)</title><rect x="1151.7" y="349" width="1.1" height="15.0" fill="rgb(240,141,39)" rx="2" ry="2" />
+<text  x="1154.67" y="359.5" ></text>
+</g>
+<g >
+<title>cudaGetDevice (1 samples, 0.07%)</title><rect x="1526.3" y="189" width="1.1" height="15.0" fill="rgb(246,109,46)" rx="2" ry="2" />
+<text  x="1529.26" y="199.5" ></text>
+</g>
+<g >
+<title>0xfffe54613630 (1 samples, 0.07%)</title><rect x="1540.8" y="253" width="1.1" height="15.0" fill="rgb(229,96,26)" rx="2" ry="2" />
+<text  x="1543.80" y="263.5" ></text>
+</g>
+<g >
+<title>0xfff8e8ce1574 (1 samples, 0.07%)</title><rect x="1458.1" y="429" width="1.1" height="15.0" fill="rgb(248,96,47)" rx="2" ry="2" />
+<text  x="1461.05" y="439.5" ></text>
+</g>
+<g >
+<title>0xffff054061e8 (6 samples, 0.42%)</title><rect x="1537.4" y="477" width="6.8" height="15.0" fill="rgb(241,96,40)" rx="2" ry="2" />
+<text  x="1540.45" y="487.5" ></text>
+</g>
+<g >
+<title>transformer_engine::convertNVTETensorCheck (1 samples, 0.07%)</title><rect x="1118.1" y="365" width="1.1" height="15.0" fill="rgb(239,158,37)" rx="2" ry="2" />
+<text  x="1121.12" y="375.5" ></text>
+</g>
+<g >
+<title>at::_ops::empty_memory_format::redispatch (1 samples, 0.07%)</title><rect x="1126.0" y="333" width="1.1" height="15.0" fill="rgb(242,111,41)" rx="2" ry="2" />
+<text  x="1128.95" y="343.5" ></text>
+</g>
+<g >
+<title>std::condition_variable::wait (1 samples, 0.07%)</title><rect x="1461.4" y="477" width="1.1" height="15.0" fill="rgb(237,146,35)" rx="2" ry="2" />
+<text  x="1464.41" y="487.5" ></text>
+</g>
+<g >
+<title>0xfffe546278e8 (1 samples, 0.07%)</title><rect x="1129.3" y="77" width="1.1" height="15.0" fill="rgb(236,96,34)" rx="2" ry="2" />
+<text  x="1132.31" y="87.5" ></text>
+</g>
+<g >
+<title>0xffff05c150b0 (1 samples, 0.07%)</title><rect x="1129.3" y="173" width="1.1" height="15.0" fill="rgb(230,96,27)" rx="2" ry="2" />
+<text  x="1132.31" y="183.5" ></text>
+</g>
+<g >
+<title>0xffff05bbe554 (1 samples, 0.07%)</title><rect x="231.4" y="301" width="1.1" height="15.0" fill="rgb(238,96,36)" rx="2" ry="2" />
+<text  x="234.40" y="311.5" ></text>
+</g>
+<g >
+<title>0xfffe546ba434 (1 samples, 0.07%)</title><rect x="1555.3" y="253" width="1.2" height="15.0" fill="rgb(241,96,39)" rx="2" ry="2" />
+<text  x="1558.34" y="263.5" ></text>
+</g>
+<g >
+<title>0xffffe4aa9960 (1 samples, 0.07%)</title><rect x="1583.3" y="445" width="1.1" height="15.0" fill="rgb(223,96,20)" rx="2" ry="2" />
+<text  x="1586.29" y="455.5" ></text>
+</g>
+<g >
+<title>0xfffe546b4be4 (1 samples, 0.07%)</title><rect x="1517.3" y="269" width="1.1" height="15.0" fill="rgb(247,96,47)" rx="2" ry="2" />
+<text  x="1520.32" y="279.5" ></text>
+</g>
+<g >
+<title>0xffff05ad793c (5 samples, 0.35%)</title><rect x="506.5" y="253" width="5.6" height="15.0" fill="rgb(225,96,22)" rx="2" ry="2" />
+<text  x="509.48" y="263.5" ></text>
+</g>
+<g >
+<title>0xffff05ae2d1c (776 samples, 54.92%)</title><rect x="234.8" y="285" width="867.7" height="15.0" fill="rgb(231,96,28)" rx="2" ry="2" />
+<text  x="237.76" y="295.5" >0xffff05ae2d1c</text>
+</g>
+<g >
+<title>cudaGetDevice (1 samples, 0.07%)</title><rect x="1555.3" y="349" width="1.2" height="15.0" fill="rgb(246,109,46)" rx="2" ry="2" />
+<text  x="1558.34" y="359.5" ></text>
+</g>
+<g >
+<title>0xfffe546b4be4 (1 samples, 0.07%)</title><rect x="1117.0" y="301" width="1.1" height="15.0" fill="rgb(247,96,47)" rx="2" ry="2" />
+<text  x="1120.01" y="311.5" ></text>
+</g>
+<g >
+<title>0x503534 (9 samples, 0.64%)</title><rect x="1140.5" y="477" width="10.1" height="15.0" fill="rgb(240,99,38)" rx="2" ry="2" />
+<text  x="1143.49" y="487.5" ></text>
+</g>
+<g >
+<title>0xfffe546b4dd8 (1 samples, 0.07%)</title><rect x="1126.0" y="173" width="1.1" height="15.0" fill="rgb(240,96,39)" rx="2" ry="2" />
+<text  x="1128.95" y="183.5" ></text>
+</g>
+<g >
+<title>_PyObject_LookupAttr (1 samples, 0.07%)</title><rect x="1498.3" y="493" width="1.1" height="15.0" fill="rgb(235,171,33)" rx="2" ry="2" />
+<text  x="1501.31" y="503.5" ></text>
+</g>
+<g >
+<title>$x (5 samples, 0.35%)</title><rect x="1133.8" y="333" width="5.6" height="15.0" fill="rgb(251,113,50)" rx="2" ry="2" />
+<text  x="1136.78" y="343.5" ></text>
+</g>
+<g >
+<title>0xfffe546b4be4 (1 samples, 0.07%)</title><rect x="1114.8" y="269" width="1.1" height="15.0" fill="rgb(247,96,47)" rx="2" ry="2" />
+<text  x="1117.77" y="279.5" ></text>
+</g>
+<g >
+<title>0xffff05a15678 (3 samples, 0.21%)</title><rect x="1160.6" y="445" width="3.4" height="15.0" fill="rgb(240,96,38)" rx="2" ry="2" />
+<text  x="1163.62" y="455.5" ></text>
+</g>
+<g >
+<title>0xfffe546b4c44 (1 samples, 0.07%)</title><rect x="1126.0" y="157" width="1.1" height="15.0" fill="rgb(240,96,39)" rx="2" ry="2" />
+<text  x="1128.95" y="167.5" ></text>
+</g>
+<g >
+<title>0xfffe546232bc (1 samples, 0.07%)</title><rect x="1441.3" y="269" width="1.1" height="15.0" fill="rgb(226,96,24)" rx="2" ry="2" />
+<text  x="1444.28" y="279.5" ></text>
+</g>
+<g >
+<title>0xfffe546ba434 (1 samples, 0.07%)</title><rect x="1143.8" y="301" width="1.2" height="15.0" fill="rgb(241,96,39)" rx="2" ry="2" />
+<text  x="1146.84" y="311.5" ></text>
+</g>
+<g >
+<title>0xffffd8093a48 (1 samples, 0.07%)</title><rect x="1534.1" y="461" width="1.1" height="15.0" fill="rgb(235,96,33)" rx="2" ry="2" />
+<text  x="1537.09" y="471.5" ></text>
+</g>
+<g >
+<title>0xffffe4c6f02c (1 samples, 0.07%)</title><rect x="24.5" y="365" width="1.2" height="15.0" fill="rgb(232,96,30)" rx="2" ry="2" />
+<text  x="27.54" y="375.5" ></text>
+</g>
+<g >
+<title>0xfffe546ba434 (1 samples, 0.07%)</title><rect x="1516.2" y="285" width="1.1" height="15.0" fill="rgb(241,96,39)" rx="2" ry="2" />
+<text  x="1519.20" y="295.5" ></text>
+</g>
+<g >
+<title>0xffff05ad7940 (2 samples, 0.14%)</title><rect x="512.1" y="253" width="2.2" height="15.0" fill="rgb(226,96,23)" rx="2" ry="2" />
+<text  x="515.07" y="263.5" ></text>
+</g>
+<g >
+<title>0xfff8e8cde774 (1 samples, 0.07%)</title><rect x="1577.7" y="461" width="1.1" height="15.0" fill="rgb(246,96,45)" rx="2" ry="2" />
+<text  x="1580.70" y="471.5" ></text>
+</g>
+<g >
+<title>0xfffe708aca90 (2 samples, 0.14%)</title><rect x="80.4" y="397" width="2.3" height="15.0" fill="rgb(238,96,36)" rx="2" ry="2" />
+<text  x="83.45" y="407.5" ></text>
+</g>
+<g >
+<title>c10::cuda::GetDevice (1 samples, 0.07%)</title><rect x="1524.0" y="205" width="1.1" height="15.0" fill="rgb(246,132,46)" rx="2" ry="2" />
+<text  x="1527.03" y="215.5" ></text>
+</g>
+<g >
+<title>0xffff05bcf8c0 (1 samples, 0.07%)</title><rect x="1543.0" y="365" width="1.2" height="15.0" fill="rgb(235,96,33)" rx="2" ry="2" />
+<text  x="1546.04" y="375.5" ></text>
+</g>
+<g >
+<title>0xfffe70accde8 (4 samples, 0.28%)</title><rect x="78.2" y="445" width="4.5" height="15.0" fill="rgb(239,96,38)" rx="2" ry="2" />
+<text  x="81.21" y="455.5" ></text>
+</g>
+<g >
+<title>0xffff05a013c4 (1 samples, 0.07%)</title><rect x="1576.6" y="381" width="1.1" height="15.0" fill="rgb(249,96,48)" rx="2" ry="2" />
+<text  x="1579.58" y="391.5" ></text>
+</g>
+<g >
+<title>at::_ops::slice_Tensor::redispatch (1 samples, 0.07%)</title><rect x="1439.0" y="365" width="1.2" height="15.0" fill="rgb(242,111,41)" rx="2" ry="2" />
+<text  x="1442.04" y="375.5" ></text>
+</g>
+<g >
+<title>_PyEval_EvalFrameDefault (19 samples, 1.34%)</title><rect x="1430.1" y="477" width="21.2" height="15.0" fill="rgb(228,171,25)" rx="2" ry="2" />
+<text  x="1433.10" y="487.5" >_..</text>
+</g>
+<g >
+<title>$x (2 samples, 0.14%)</title><rect x="1142.7" y="381" width="2.3" height="15.0" fill="rgb(251,113,50)" rx="2" ry="2" />
+<text  x="1145.72" y="391.5" ></text>
+</g>
+<g >
+<title>_PyEval_EvalFrameDefault (29 samples, 2.05%)</title><rect x="1462.5" y="493" width="32.5" height="15.0" fill="rgb(228,171,25)" rx="2" ry="2" />
+<text  x="1465.53" y="503.5" >_P..</text>
+</g>
+<g >
+<title>0xfffff7fc28dc (1 samples, 0.07%)</title><rect x="1149.4" y="429" width="1.2" height="15.0" fill="rgb(232,96,30)" rx="2" ry="2" />
+<text  x="1152.43" y="439.5" ></text>
+</g>
+<g >
+<title>0xffff05bbfae4 (3 samples, 0.21%)</title><rect x="184.4" y="285" width="3.4" height="15.0" fill="rgb(248,96,47)" rx="2" ry="2" />
+<text  x="187.44" y="295.5" ></text>
+</g>
+<g >
+<title>0xfffe546c351c (1 samples, 0.07%)</title><rect x="1441.3" y="285" width="1.1" height="15.0" fill="rgb(230,96,27)" rx="2" ry="2" />
+<text  x="1444.28" y="295.5" ></text>
+</g>
+<g >
+<title>$x (2 samples, 0.14%)</title><rect x="1136.0" y="205" width="2.3" height="15.0" fill="rgb(251,113,50)" rx="2" ry="2" />
+<text  x="1139.02" y="215.5" ></text>
+</g>
+<g >
+<title>0xfffe546b4dd8 (1 samples, 0.07%)</title><rect x="1530.7" y="109" width="1.2" height="15.0" fill="rgb(240,96,39)" rx="2" ry="2" />
+<text  x="1533.74" y="119.5" ></text>
+</g>
+<g >
+<title>0xfffe546b4dd8 (1 samples, 0.07%)</title><rect x="1117.0" y="317" width="1.1" height="15.0" fill="rgb(240,96,39)" rx="2" ry="2" />
+<text  x="1120.01" y="327.5" ></text>
+</g>
+<g >
+<title>$x (1 samples, 0.07%)</title><rect x="1126.0" y="349" width="1.1" height="15.0" fill="rgb(251,113,50)" rx="2" ry="2" />
+<text  x="1128.95" y="359.5" ></text>
+</g>
+<g >
+<title>c10::TensorImpl::copy_tensor_metadata (1 samples, 0.07%)</title><rect x="1560.9" y="397" width="1.1" height="15.0" fill="rgb(235,132,33)" rx="2" ry="2" />
+<text  x="1563.93" y="407.5" ></text>
+</g>
+<g >
+<title>nvte_fused_attn_bwd_v2 (8 samples, 0.57%)</title><rect x="1512.8" y="397" width="9.0" height="15.0" fill="rgb(238,163,36)" rx="2" ry="2" />
+<text  x="1515.85" y="407.5" ></text>
+</g>
+<g >
+<title>0xffff05a691f4 (1 samples, 0.07%)</title><rect x="1456.9" y="413" width="1.2" height="15.0" fill="rgb(247,96,46)" rx="2" ry="2" />
+<text  x="1459.94" y="423.5" ></text>
+</g>
+<g >
+<title>0xfffe546c30fc (1 samples, 0.07%)</title><rect x="1114.8" y="221" width="1.1" height="15.0" fill="rgb(236,96,34)" rx="2" ry="2" />
+<text  x="1117.77" y="231.5" ></text>
+</g>
+<g >
+<title>cuDevicePrimaryCtxGetState (1 samples, 0.07%)</title><rect x="1557.6" y="349" width="1.1" height="15.0" fill="rgb(245,96,45)" rx="2" ry="2" />
+<text  x="1560.57" y="359.5" ></text>
+</g>
+<g >
+<title>0xffff05b1ea94 (1 samples, 0.07%)</title><rect x="1543.0" y="381" width="1.2" height="15.0" fill="rgb(248,96,47)" rx="2" ry="2" />
+<text  x="1546.04" y="391.5" ></text>
+</g>
+<g >
+<title>0xfffe5462de1c (1 samples, 0.07%)</title><rect x="1572.1" y="301" width="1.1" height="15.0" fill="rgb(230,96,27)" rx="2" ry="2" />
+<text  x="1575.11" y="311.5" ></text>
+</g>
+<g >
+<title>PyObject_GC_UnTrack (1 samples, 0.07%)</title><rect x="1506.1" y="493" width="1.2" height="15.0" fill="rgb(242,207,40)" rx="2" ry="2" />
+<text  x="1509.14" y="503.5" ></text>
+</g>
+<g >
+<title>0xfff8e8c075f8 (1 samples, 0.07%)</title><rect x="1576.6" y="445" width="1.1" height="15.0" fill="rgb(237,96,36)" rx="2" ry="2" />
+<text  x="1579.58" y="455.5" ></text>
+</g>
+<g >
+<title>PyDict_New (1 samples, 0.07%)</title><rect x="62.6" y="493" width="1.1" height="15.0" fill="rgb(232,204,30)" rx="2" ry="2" />
+<text  x="65.55" y="503.5" ></text>
+</g>
+<g >
+<title>0xfffe546b4bc4 (1 samples, 0.07%)</title><rect x="1458.1" y="381" width="1.1" height="15.0" fill="rgb(250,96,49)" rx="2" ry="2" />
+<text  x="1461.05" y="391.5" ></text>
+</g>
+<g >
+<title>PyType_IsSubtype (1 samples, 0.07%)</title><rect x="1507.3" y="493" width="1.1" height="15.0" fill="rgb(250,230,49)" rx="2" ry="2" />
+<text  x="1510.25" y="503.5" ></text>
+</g>
+<g >
+<title>0xffffe49e1158 (1 samples, 0.07%)</title><rect x="1443.5" y="397" width="1.1" height="15.0" fill="rgb(233,96,31)" rx="2" ry="2" />
+<text  x="1446.52" y="407.5" ></text>
+</g>
+<g >
+<title>PyArray_DescrFromType (1 samples, 0.07%)</title><rect x="1108.1" y="429" width="1.1" height="15.0" fill="rgb(250,213,49)" rx="2" ry="2" />
+<text  x="1111.06" y="439.5" ></text>
+</g>
+<g >
+<title>0xfffe546c2f64 (1 samples, 0.07%)</title><rect x="1143.8" y="269" width="1.2" height="15.0" fill="rgb(236,96,34)" rx="2" ry="2" />
+<text  x="1146.84" y="279.5" ></text>
+</g>
+<g >
+<title>0x4dc00c (1 samples, 0.07%)</title><rect x="1501.7" y="493" width="1.1" height="15.0" fill="rgb(234,102,32)" rx="2" ry="2" />
+<text  x="1504.66" y="503.5" ></text>
+</g>
+<g >
+<title>at::empty (1 samples, 0.07%)</title><rect x="1530.7" y="365" width="1.2" height="15.0" fill="rgb(243,111,42)" rx="2" ry="2" />
+<text  x="1533.74" y="375.5" ></text>
+</g>
+<g >
+<title>transformer_engine::fused_attn_arbitrary_seqlen_bwd (1 samples, 0.07%)</title><rect x="1581.1" y="413" width="1.1" height="15.0" fill="rgb(243,158,42)" rx="2" ry="2" />
+<text  x="1584.05" y="423.5" ></text>
+</g>
+<g >
+<title>$x (4 samples, 0.28%)</title><rect x="1554.2" y="397" width="4.5" height="15.0" fill="rgb(251,113,50)" rx="2" ry="2" />
+<text  x="1557.22" y="407.5" ></text>
+</g>
+<g >
+<title>0x4cbd04 (1 samples, 0.07%)</title><rect x="30.1" y="493" width="1.1" height="15.0" fill="rgb(244,102,43)" rx="2" ry="2" />
+<text  x="33.13" y="503.5" ></text>
+</g>
+<g >
+<title>0xffffe59105a8 (1 samples, 0.07%)</title><rect x="1575.5" y="333" width="1.1" height="15.0" fill="rgb(231,96,28)" rx="2" ry="2" />
+<text  x="1578.46" y="343.5" ></text>
+</g>
+<g >
+<title>at::detail::empty_generic (2 samples, 0.14%)</title><rect x="1525.1" y="237" width="2.3" height="15.0" fill="rgb(228,111,25)" rx="2" ry="2" />
+<text  x="1528.15" y="247.5" ></text>
+</g>
+<g >
+<title>0xffffe5865148 (1 samples, 0.07%)</title><rect x="1426.7" y="445" width="1.2" height="15.0" fill="rgb(235,96,33)" rx="2" ry="2" />
+<text  x="1429.74" y="455.5" ></text>
+</g>
+<g >
+<title>c10::cuda::ExchangeDevice (1 samples, 0.07%)</title><rect x="1555.3" y="365" width="1.2" height="15.0" fill="rgb(246,132,46)" rx="2" ry="2" />
+<text  x="1558.34" y="375.5" ></text>
+</g>
+<g >
+<title>PyArray_DiscoverDTypeAndShape_Recursive (1 samples, 0.07%)</title><rect x="1104.7" y="397" width="1.1" height="15.0" fill="rgb(238,213,36)" rx="2" ry="2" />
+<text  x="1107.71" y="407.5" ></text>
+</g>
+<g >
+<title>$x (1 samples, 0.07%)</title><rect x="1560.9" y="445" width="1.1" height="15.0" fill="rgb(251,113,50)" rx="2" ry="2" />
+<text  x="1563.93" y="455.5" ></text>
+</g>
+<g >
+<title>at::_ops::slice_Tensor::redispatch (1 samples, 0.07%)</title><rect x="1439.0" y="285" width="1.2" height="15.0" fill="rgb(242,111,41)" rx="2" ry="2" />
+<text  x="1442.04" y="295.5" ></text>
+</g>
+<g >
+<title>$x (10 samples, 0.71%)</title><rect x="1432.3" y="445" width="11.2" height="15.0" fill="rgb(251,113,50)" rx="2" ry="2" />
+<text  x="1435.34" y="455.5" ></text>
+</g>
+<g >
+<title>0xffff05a018b4 (1 samples, 0.07%)</title><rect x="1518.4" y="317" width="1.2" height="15.0" fill="rgb(234,96,32)" rx="2" ry="2" />
+<text  x="1521.44" y="327.5" ></text>
+</g>
+<g >
+<title>0xffff05ae2f18 (1 samples, 0.07%)</title><rect x="1099.1" y="269" width="1.1" height="15.0" fill="rgb(234,96,32)" rx="2" ry="2" />
+<text  x="1102.12" y="279.5" ></text>
+</g>
+<g >
+<title>cuCtxSynchronize_v2 (914 samples, 64.69%)</title><rect x="82.7" y="397" width="1022.0" height="15.0" fill="rgb(238,100,36)" rx="2" ry="2" />
+<text  x="85.68" y="407.5" >cuCtxSynchronize_v2</text>
+</g>
+<g >
+<title>$x (2 samples, 0.14%)</title><rect x="1554.2" y="381" width="2.3" height="15.0" fill="rgb(251,113,50)" rx="2" ry="2" />
+<text  x="1557.22" y="391.5" ></text>
+</g>
+<g >
+<title>0x4cd918 (1 samples, 0.07%)</title><rect x="31.2" y="493" width="1.2" height="15.0" fill="rgb(232,102,30)" rx="2" ry="2" />
+<text  x="34.25" y="503.5" ></text>
+</g>
+<g >
+<title>$x (1 samples, 0.07%)</title><rect x="1129.3" y="237" width="1.1" height="15.0" fill="rgb(251,113,50)" rx="2" ry="2" />
+<text  x="1132.31" y="247.5" ></text>
+</g>
+<g >
+<title>0xfffe7099d760 (1 samples, 0.07%)</title><rect x="80.4" y="365" width="1.2" height="15.0" fill="rgb(225,96,22)" rx="2" ry="2" />
+<text  x="83.45" y="375.5" ></text>
+</g>
+<g >
+<title>_init (1 samples, 0.07%)</title><rect x="1531.9" y="349" width="1.1" height="15.0" fill="rgb(236,153,34)" rx="2" ry="2" />
+<text  x="1534.85" y="359.5" ></text>
+</g>
+<g >
+<title>transformer_engine::pytorch::quantizer_helper (2 samples, 0.14%)</title><rect x="1530.7" y="397" width="2.3" height="15.0" fill="rgb(243,158,41)" rx="2" ry="2" />
+<text  x="1533.74" y="407.5" ></text>
+</g>
+<g >
+<title>0xffff05ad7a60 (8 samples, 0.57%)</title><rect x="1080.1" y="253" width="9.0" height="15.0" fill="rgb(229,96,26)" rx="2" ry="2" />
+<text  x="1083.11" y="263.5" ></text>
+</g>
+<g >
+<title>0xfff8e6aaf348 (1 samples, 0.07%)</title><rect x="1573.2" y="445" width="1.1" height="15.0" fill="rgb(233,96,31)" rx="2" ry="2" />
+<text  x="1576.23" y="455.5" ></text>
+</g>
+<g >
+<title>0xfffe546ba434 (1 samples, 0.07%)</title><rect x="1128.2" y="189" width="1.1" height="15.0" fill="rgb(241,96,39)" rx="2" ry="2" />
+<text  x="1131.19" y="199.5" ></text>
+</g>
+<g >
+<title>0xfff8e8c072e0 (1 samples, 0.07%)</title><rect x="1572.1" y="429" width="1.1" height="15.0" fill="rgb(237,96,35)" rx="2" ry="2" />
+<text  x="1575.11" y="439.5" ></text>
+</g>
+<g >
+<title>0x4d08e4 (1 samples, 0.07%)</title><rect x="32.4" y="493" width="1.1" height="15.0" fill="rgb(243,102,42)" rx="2" ry="2" />
+<text  x="35.36" y="503.5" ></text>
+</g>
+<g >
+<title>PyMem_Malloc (1 samples, 0.07%)</title><rect x="63.7" y="493" width="1.1" height="15.0" fill="rgb(238,213,36)" rx="2" ry="2" />
+<text  x="66.67" y="503.5" ></text>
+</g>
+<g >
+<title>0xfffe546ba268 (1 samples, 0.07%)</title><rect x="1516.2" y="269" width="1.1" height="15.0" fill="rgb(232,96,29)" rx="2" ry="2" />
+<text  x="1519.20" y="279.5" ></text>
+</g>
+<g >
+<title>0xffff05bbfb04 (1 samples, 0.07%)</title><rect x="187.8" y="285" width="1.1" height="15.0" fill="rgb(245,96,44)" rx="2" ry="2" />
+<text  x="190.79" y="295.5" ></text>
+</g>
+<g >
+<title>cuKernelSetAttribute (1 samples, 0.07%)</title><rect x="1575.5" y="429" width="1.1" height="15.0" fill="rgb(240,112,38)" rx="2" ry="2" />
+<text  x="1578.46" y="439.5" ></text>
+</g>
+<g >
+<title>at::detail::empty_cuda (1 samples, 0.07%)</title><rect x="1530.7" y="237" width="1.2" height="15.0" fill="rgb(235,111,33)" rx="2" ry="2" />
+<text  x="1533.74" y="247.5" ></text>
+</g>
+<g >
+<title>0xfffe546b4b68 (1 samples, 0.07%)</title><rect x="1522.9" y="189" width="1.1" height="15.0" fill="rgb(232,96,29)" rx="2" ry="2" />
+<text  x="1525.91" y="199.5" ></text>
+</g>
+<g >
+<title>0xffff05ad7908 (1 samples, 0.07%)</title><rect x="346.6" y="253" width="1.1" height="15.0" fill="rgb(233,96,31)" rx="2" ry="2" />
+<text  x="349.57" y="263.5" ></text>
+</g>
+<g >
+<title>$x (1 samples, 0.07%)</title><rect x="1145.0" y="429" width="1.1" height="15.0" fill="rgb(251,113,50)" rx="2" ry="2" />
+<text  x="1147.96" y="439.5" ></text>
+</g>
+<g >
+<title>NSYS_OSRT_pthread_cond_signal_1 (1 samples, 0.07%)</title><rect x="1141.6" y="381" width="1.1" height="15.0" fill="rgb(231,119,29)" rx="2" ry="2" />
+<text  x="1144.61" y="391.5" ></text>
+</g>
+<g >
+<title>PyObject_Call (1 samples, 0.07%)</title><rect x="64.8" y="493" width="1.1" height="15.0" fill="rgb(230,207,28)" rx="2" ry="2" />
+<text  x="67.79" y="503.5" ></text>
+</g>
+<g >
+<title>0xfffe546ba268 (1 samples, 0.07%)</title><rect x="1572.1" y="333" width="1.1" height="15.0" fill="rgb(232,96,29)" rx="2" ry="2" />
+<text  x="1575.11" y="343.5" ></text>
+</g>
+<g >
+<title>PyArray_DiscoverDTypeAndShape_Recursive (1 samples, 0.07%)</title><rect x="1104.7" y="381" width="1.1" height="15.0" fill="rgb(238,213,36)" rx="2" ry="2" />
+<text  x="1107.71" y="391.5" ></text>
+</g>
+<g >
+<title>0xfff8e8c00768 (1 samples, 0.07%)</title><rect x="1571.0" y="461" width="1.1" height="15.0" fill="rgb(228,96,26)" rx="2" ry="2" />
+<text  x="1573.99" y="471.5" ></text>
+</g>
+<g >
+<title>at::_ops::slice_Tensor::call (3 samples, 0.21%)</title><rect x="1436.8" y="413" width="3.4" height="15.0" fill="rgb(230,111,28)" rx="2" ry="2" />
+<text  x="1439.81" y="423.5" ></text>
+</g>
+<g >
+<title>c10::TensorImpl::~TensorImpl (2 samples, 0.14%)</title><rect x="1152.8" y="413" width="2.2" height="15.0" fill="rgb(238,132,36)" rx="2" ry="2" />
+<text  x="1155.79" y="423.5" ></text>
+</g>
+<g >
+<title>0xffffe49e3c24 (1 samples, 0.07%)</title><rect x="1110.3" y="381" width="1.1" height="15.0" fill="rgb(242,96,41)" rx="2" ry="2" />
+<text  x="1113.30" y="391.5" ></text>
+</g>
+<g >
+<title>0xffffd8054c04 (1 samples, 0.07%)</title><rect x="21.2" y="413" width="1.1" height="15.0" fill="rgb(245,96,44)" rx="2" ry="2" />
+<text  x="24.18" y="423.5" ></text>
+</g>
+<g >
+<title>$x (5 samples, 0.35%)</title><rect x="1133.8" y="301" width="5.6" height="15.0" fill="rgb(251,113,50)" rx="2" ry="2" />
+<text  x="1136.78" y="311.5" ></text>
+</g>
+<g >
+<title>0xffff05b608a4 (4 samples, 0.28%)</title><rect x="82.7" y="317" width="4.5" height="15.0" fill="rgb(236,96,34)" rx="2" ry="2" />
+<text  x="85.68" y="327.5" ></text>
+</g>
+<g >
+<title>at::native::empty_cuda (4 samples, 0.28%)</title><rect x="1134.9" y="269" width="4.5" height="15.0" fill="rgb(235,111,33)" rx="2" ry="2" />
+<text  x="1137.90" y="279.5" ></text>
+</g>
+<g >
+<title>at::empty (2 samples, 0.14%)</title><rect x="1527.4" y="381" width="2.2" height="15.0" fill="rgb(243,111,42)" rx="2" ry="2" />
+<text  x="1530.38" y="391.5" ></text>
+</g>
+<g >
+<title>cudnn::cnn::EngineInterface::execute (6 samples, 0.42%)</title><rect x="1453.6" y="477" width="6.7" height="15.0" fill="rgb(240,109,38)" rx="2" ry="2" />
+<text  x="1456.58" y="487.5" ></text>
+</g>
+<g >
+<title>$x (1 samples, 0.07%)</title><rect x="1126.0" y="269" width="1.1" height="15.0" fill="rgb(251,113,50)" rx="2" ry="2" />
+<text  x="1128.95" y="279.5" ></text>
+</g>
+<g >
+<title>0x50fd90 (1 samples, 0.07%)</title><rect x="1446.9" y="461" width="1.1" height="15.0" fill="rgb(236,99,34)" rx="2" ry="2" />
+<text  x="1449.87" y="471.5" ></text>
+</g>
+<g >
+<title>0xffff05bbfadc (1 samples, 0.07%)</title><rect x="183.3" y="285" width="1.1" height="15.0" fill="rgb(237,96,35)" rx="2" ry="2" />
+<text  x="186.32" y="295.5" ></text>
+</g>
+<g >
+<title>0xffff05bbfb24 (7 samples, 0.50%)</title><rect x="195.6" y="285" width="7.8" height="15.0" fill="rgb(243,96,42)" rx="2" ry="2" />
+<text  x="198.62" y="295.5" ></text>
+</g>
+<g >
+<title>0xffffe51448d4 (3 samples, 0.21%)</title><rect x="21.2" y="445" width="3.3" height="15.0" fill="rgb(244,96,43)" rx="2" ry="2" />
+<text  x="24.18" y="455.5" ></text>
+</g>
+<g >
+<title>at::_ops::empty_memory_format::call (3 samples, 0.21%)</title><rect x="1128.2" y="365" width="3.3" height="15.0" fill="rgb(230,111,28)" rx="2" ry="2" />
+<text  x="1131.19" y="375.5" ></text>
+</g>
+<g >
+<title>0xffff05ad7944 (2 samples, 0.14%)</title><rect x="514.3" y="253" width="2.2" height="15.0" fill="rgb(236,96,34)" rx="2" ry="2" />
+<text  x="517.30" y="263.5" ></text>
+</g>
+<g >
+<title>transformer_engine::pytorch::makeTransformerEngineTensor (2 samples, 0.14%)</title><rect x="1131.5" y="397" width="2.3" height="15.0" fill="rgb(242,158,40)" rx="2" ry="2" />
+<text  x="1134.54" y="407.5" ></text>
+</g>
+<g >
+<title>0xffff05ad7a58 (5 samples, 0.35%)</title><rect x="1073.4" y="253" width="5.6" height="15.0" fill="rgb(233,96,31)" rx="2" ry="2" />
+<text  x="1076.40" y="263.5" ></text>
+</g>
+<g >
+<title>0xfffe546c30fc (1 samples, 0.07%)</title><rect x="1456.9" y="333" width="1.2" height="15.0" fill="rgb(236,96,34)" rx="2" ry="2" />
+<text  x="1459.94" y="343.5" ></text>
+</g>
+<g >
+<title>NSYS_OSRT_pthread_cond_signal_1 (1 samples, 0.07%)</title><rect x="1423.4" y="461" width="1.1" height="15.0" fill="rgb(231,119,29)" rx="2" ry="2" />
+<text  x="1426.39" y="471.5" ></text>
+</g>
+<g >
+<title>0xffff05b1d5c4 (1 samples, 0.07%)</title><rect x="1539.7" y="381" width="1.1" height="15.0" fill="rgb(248,96,47)" rx="2" ry="2" />
+<text  x="1542.68" y="391.5" ></text>
+</g>
+<g >
+<title>0xffffe5864198 (1 samples, 0.07%)</title><rect x="1520.7" y="317" width="1.1" height="15.0" fill="rgb(241,96,40)" rx="2" ry="2" />
+<text  x="1523.67" y="327.5" ></text>
+</g>
+<g >
+<title>nvte_fused_attn_fwd_v2 (12 samples, 0.85%)</title><rect x="1110.3" y="397" width="13.4" height="15.0" fill="rgb(238,163,36)" rx="2" ry="2" />
+<text  x="1113.30" y="407.5" ></text>
+</g>
+<g >
+<title>transformer_engine::cuda::current_device (1 samples, 0.07%)</title><rect x="1581.1" y="349" width="1.1" height="15.0" fill="rgb(246,158,46)" rx="2" ry="2" />
+<text  x="1584.05" y="359.5" ></text>
+</g>
+<g >
+<title>0xffffe59105a0 (1 samples, 0.07%)</title><rect x="1524.0" y="125" width="1.1" height="15.0" fill="rgb(227,96,24)" rx="2" ry="2" />
+<text  x="1527.03" y="135.5" ></text>
+</g>
+<g >
+<title>0xfffe546c308c (1 samples, 0.07%)</title><rect x="1555.3" y="221" width="1.2" height="15.0" fill="rgb(238,96,36)" rx="2" ry="2" />
+<text  x="1558.34" y="231.5" ></text>
+</g>
+<g >
+<title>0xffff05a909c8 (1 samples, 0.07%)</title><rect x="1160.6" y="413" width="1.1" height="15.0" fill="rgb(238,96,36)" rx="2" ry="2" />
+<text  x="1163.62" y="423.5" ></text>
+</g>
+<g >
+<title>NSYS_OSRT_pthread_cond_wait_1 (1 samples, 0.07%)</title><rect x="1461.4" y="461" width="1.1" height="15.0" fill="rgb(226,119,23)" rx="2" ry="2" />
+<text  x="1464.41" y="471.5" ></text>
+</g>
+<g >
+<title>0x4f5438 (1 samples, 0.07%)</title><rect x="41.3" y="493" width="1.1" height="15.0" fill="rgb(234,102,31)" rx="2" ry="2" />
+<text  x="44.31" y="503.5" ></text>
+</g>
+<g >
+<title>transformer_engine::fused_attn::fused_attn_arbitrary_seqlen_bwd_impl (1 samples, 0.07%)</title><rect x="1581.1" y="397" width="1.1" height="15.0" fill="rgb(238,158,36)" rx="2" ry="2" />
+<text  x="1584.05" y="407.5" ></text>
+</g>
+<g >
+<title>0xffff05bbf098 (20 samples, 1.42%)</title><rect x="131.9" y="285" width="22.3" height="15.0" fill="rgb(242,96,41)" rx="2" ry="2" />
+<text  x="134.88" y="295.5" >0..</text>
+</g>
+<g >
+<title>0xffff05a655bc (1 samples, 0.07%)</title><rect x="1142.7" y="349" width="1.1" height="15.0" fill="rgb(224,96,21)" rx="2" ry="2" />
+<text  x="1145.72" y="359.5" ></text>
+</g>
+<g >
+<title>0xfff8e8c00a70 (1 samples, 0.07%)</title><rect x="1453.6" y="445" width="1.1" height="15.0" fill="rgb(240,96,38)" rx="2" ry="2" />
+<text  x="1456.58" y="455.5" ></text>
+</g>
+<g >
+<title>0xffff05bbfb20 (3 samples, 0.21%)</title><rect x="192.3" y="285" width="3.3" height="15.0" fill="rgb(233,96,30)" rx="2" ry="2" />
+<text  x="195.26" y="295.5" ></text>
+</g>
+<g >
+<title>0xffffe49f2a34 (1 samples, 0.07%)</title><rect x="23.4" y="365" width="1.1" height="15.0" fill="rgb(243,96,41)" rx="2" ry="2" />
+<text  x="26.42" y="375.5" ></text>
+</g>
+<g >
+<title>$x (1 samples, 0.07%)</title><rect x="1136.0" y="189" width="1.1" height="15.0" fill="rgb(251,113,50)" rx="2" ry="2" />
+<text  x="1139.02" y="199.5" ></text>
+</g>
+<g >
+<title>$x (914 samples, 64.69%)</title><rect x="82.7" y="461" width="1022.0" height="15.0" fill="rgb(251,113,50)" rx="2" ry="2" />
+<text  x="85.68" y="471.5" >$x</text>
+</g>
+<g >
+<title>0xffff05ae2d08 (1 samples, 0.07%)</title><rect x="232.5" y="285" width="1.1" height="15.0" fill="rgb(237,96,35)" rx="2" ry="2" />
+<text  x="235.52" y="295.5" ></text>
+</g>
+<g >
+<title>$x (1 samples, 0.07%)</title><rect x="1524.0" y="221" width="1.1" height="15.0" fill="rgb(251,113,50)" rx="2" ry="2" />
+<text  x="1527.03" y="231.5" ></text>
+</g>
+<g >
+<title>0xffffe49e3a88 (1 samples, 0.07%)</title><rect x="1512.8" y="365" width="1.2" height="15.0" fill="rgb(242,96,41)" rx="2" ry="2" />
+<text  x="1515.85" y="375.5" ></text>
+</g>
+<g >
+<title>0x56f4f0 (1 samples, 0.07%)</title><rect x="57.0" y="493" width="1.1" height="15.0" fill="rgb(234,99,32)" rx="2" ry="2" />
+<text  x="59.96" y="503.5" ></text>
+</g>
+<g >
+<title>0xffff05bbf07c (1 samples, 0.07%)</title><rect x="125.2" y="285" width="1.1" height="15.0" fill="rgb(239,96,37)" rx="2" ry="2" />
+<text  x="128.17" y="295.5" ></text>
+</g>
+<g >
+<title>0xfffe70aeb6e8 (1 samples, 0.07%)</title><rect x="80.4" y="349" width="1.2" height="15.0" fill="rgb(238,96,36)" rx="2" ry="2" />
+<text  x="83.45" y="359.5" ></text>
+</g>
+<g >
+<title>c10::cuda::device_synchronize (914 samples, 64.69%)</title><rect x="82.7" y="445" width="1022.0" height="15.0" fill="rgb(245,132,44)" rx="2" ry="2" />
+<text  x="85.68" y="455.5" >c10::cuda::device_synchronize</text>
+</g>
+<g >
+<title>0xffff05ad78f4 (2 samples, 0.14%)</title><rect x="317.5" y="253" width="2.2" height="15.0" fill="rgb(242,96,41)" rx="2" ry="2" />
+<text  x="320.50" y="263.5" ></text>
+</g>
+<g >
+<title>0xffff05a0150c (1 samples, 0.07%)</title><rect x="1576.6" y="349" width="1.1" height="15.0" fill="rgb(231,96,29)" rx="2" ry="2" />
+<text  x="1579.58" y="359.5" ></text>
+</g>
+<g >
+<title>at::sequence_number::peek (1 samples, 0.07%)</title><rect x="1149.4" y="445" width="1.2" height="15.0" fill="rgb(237,111,35)" rx="2" ry="2" />
+<text  x="1152.43" y="455.5" ></text>
+</g>
+<g >
+<title>0xffff05a5ca30 (1 samples, 0.07%)</title><rect x="1575.5" y="413" width="1.1" height="15.0" fill="rgb(232,96,30)" rx="2" ry="2" />
+<text  x="1578.46" y="423.5" ></text>
+</g>
+<g >
+<title>0xffffe585a4c4 (1 samples, 0.07%)</title><rect x="26.8" y="317" width="1.1" height="15.0" fill="rgb(248,96,48)" rx="2" ry="2" />
+<text  x="29.77" y="327.5" ></text>
+</g>
+<g >
+<title>$x (3 samples, 0.21%)</title><rect x="1151.7" y="445" width="3.3" height="15.0" fill="rgb(251,113,50)" rx="2" ry="2" />
+<text  x="1154.67" y="455.5" ></text>
+</g>
+<g >
+<title>PyArray_DescrFromType (1 samples, 0.07%)</title><rect x="1104.7" y="365" width="1.1" height="15.0" fill="rgb(250,213,49)" rx="2" ry="2" />
+<text  x="1107.71" y="375.5" ></text>
+</g>
+<g >
+<title>$x (4 samples, 0.28%)</title><rect x="1140.5" y="445" width="4.5" height="15.0" fill="rgb(251,113,50)" rx="2" ry="2" />
+<text  x="1143.49" y="455.5" ></text>
+</g>
+<g >
+<title>torch::autograd::impl::gradient_edge (1 samples, 0.07%)</title><rect x="1147.2" y="429" width="1.1" height="15.0" fill="rgb(246,157,45)" rx="2" ry="2" />
+<text  x="1150.20" y="439.5" ></text>
+</g>
+<g >
+<title>at::detail::empty_cuda (2 samples, 0.14%)</title><rect x="1129.3" y="253" width="2.2" height="15.0" fill="rgb(235,111,33)" rx="2" ry="2" />
+<text  x="1132.31" y="263.5" ></text>
+</g>
+<g >
+<title>0xfffe546ba268 (1 samples, 0.07%)</title><rect x="1139.4" y="221" width="1.1" height="15.0" fill="rgb(232,96,29)" rx="2" ry="2" />
+<text  x="1142.37" y="231.5" ></text>
+</g>
+<g >
+<title>0xfffe546b4dd8 (1 samples, 0.07%)</title><rect x="1538.6" y="429" width="1.1" height="15.0" fill="rgb(240,96,39)" rx="2" ry="2" />
+<text  x="1541.56" y="439.5" ></text>
+</g>
+<g >
+<title>0xffff05ad78f0 (1 samples, 0.07%)</title><rect x="316.4" y="253" width="1.1" height="15.0" fill="rgb(232,96,29)" rx="2" ry="2" />
+<text  x="319.38" y="263.5" ></text>
+</g>
+<g >
+<title>0xffff05bbeeec (1 samples, 0.07%)</title><rect x="114.0" y="285" width="1.1" height="15.0" fill="rgb(233,96,31)" rx="2" ry="2" />
+<text  x="116.99" y="295.5" ></text>
+</g>
+<g >
+<title>0xffffc7176148 (1 samples, 0.07%)</title><rect x="1126.0" y="221" width="1.1" height="15.0" fill="rgb(235,96,33)" rx="2" ry="2" />
+<text  x="1128.95" y="231.5" ></text>
+</g>
+<g >
+<title>0xffff05ad78cc (1 samples, 0.07%)</title><rect x="248.2" y="253" width="1.1" height="15.0" fill="rgb(233,96,31)" rx="2" ry="2" />
+<text  x="251.17" y="263.5" ></text>
+</g>
+<g >
+<title>transformer_engine::pytorch::allocateSpace (4 samples, 0.28%)</title><rect x="1127.1" y="397" width="4.4" height="15.0" fill="rgb(252,158,52)" rx="2" ry="2" />
+<text  x="1130.07" y="407.5" ></text>
+</g>
+<g >
+<title>0xfffff7fa056c (11 samples, 0.78%)</title><rect x="1167.3" y="461" width="12.3" height="15.0" fill="rgb(224,96,21)" rx="2" ry="2" />
+<text  x="1170.32" y="471.5" ></text>
+</g>
+<g >
+<title>0xffff05c150b0 (1 samples, 0.07%)</title><rect x="1128.2" y="237" width="1.1" height="15.0" fill="rgb(230,96,27)" rx="2" ry="2" />
+<text  x="1131.19" y="247.5" ></text>
+</g>
+<g >
+<title>0xfffe546ba434 (1 samples, 0.07%)</title><rect x="1546.4" y="269" width="1.1" height="15.0" fill="rgb(241,96,39)" rx="2" ry="2" />
+<text  x="1549.39" y="279.5" ></text>
+</g>
+<g >
+<title>0xfffe546ba1ec (1 samples, 0.07%)</title><rect x="1115.9" y="269" width="1.1" height="15.0" fill="rgb(236,96,34)" rx="2" ry="2" />
+<text  x="1118.89" y="279.5" ></text>
+</g>
+<g >
+<title>c10::TensorImpl::copy_generic_tensor_metadata (1 samples, 0.07%)</title><rect x="1560.9" y="365" width="1.1" height="15.0" fill="rgb(235,132,33)" rx="2" ry="2" />
+<text  x="1563.93" y="375.5" ></text>
+</g>
+<g >
+<title>0xfff8e8c00a70 (1 samples, 0.07%)</title><rect x="1568.8" y="445" width="1.1" height="15.0" fill="rgb(240,96,38)" rx="2" ry="2" />
+<text  x="1571.75" y="455.5" ></text>
+</g>
+<g >
+<title>0xffff05ad78d4 (6 samples, 0.42%)</title><rect x="256.0" y="253" width="6.7" height="15.0" fill="rgb(244,96,43)" rx="2" ry="2" />
+<text  x="259.00" y="263.5" ></text>
+</g>
+<g >
+<title>0xffffc71a5fd8 (1 samples, 0.07%)</title><rect x="1524.0" y="173" width="1.1" height="15.0" fill="rgb(239,96,37)" rx="2" ry="2" />
+<text  x="1527.03" y="183.5" ></text>
+</g>
+<g >
+<title>_PyThreadState_UncheckedGet (1 samples, 0.07%)</title><rect x="1500.5" y="493" width="1.2" height="15.0" fill="rgb(234,171,32)" rx="2" ry="2" />
+<text  x="1503.54" y="503.5" ></text>
+</g>
+<g >
+<title>0xfffe546ba434 (1 samples, 0.07%)</title><rect x="1545.3" y="301" width="1.1" height="15.0" fill="rgb(241,96,39)" rx="2" ry="2" />
+<text  x="1548.27" y="311.5" ></text>
+</g>
+<g >
+<title>0xfffe546b4dd8 (1 samples, 0.07%)</title><rect x="1458.1" y="397" width="1.1" height="15.0" fill="rgb(240,96,39)" rx="2" ry="2" />
+<text  x="1461.05" y="407.5" ></text>
+</g>
+<g >
+<title>0xffff05bbef98 (2 samples, 0.14%)</title><rect x="121.8" y="285" width="2.3" height="15.0" fill="rgb(238,96,36)" rx="2" ry="2" />
+<text  x="124.82" y="295.5" ></text>
+</g>
+<g >
+<title>$x (1 samples, 0.07%)</title><rect x="1153.9" y="317" width="1.1" height="15.0" fill="rgb(251,113,50)" rx="2" ry="2" />
+<text  x="1156.91" y="327.5" ></text>
+</g>
+<g >
+<title>$x (3 samples, 0.21%)</title><rect x="1436.8" y="381" width="3.4" height="15.0" fill="rgb(251,113,50)" rx="2" ry="2" />
+<text  x="1439.81" y="391.5" ></text>
+</g>
+<g >
+<title>0xffffe49eee0c (1 samples, 0.07%)</title><rect x="1159.5" y="413" width="1.1" height="15.0" fill="rgb(231,96,29)" rx="2" ry="2" />
+<text  x="1162.50" y="423.5" ></text>
+</g>
+<g >
+<title>c10::cuda::GetDevice (1 samples, 0.07%)</title><rect x="1526.3" y="205" width="1.1" height="15.0" fill="rgb(246,132,46)" rx="2" ry="2" />
+<text  x="1529.26" y="215.5" ></text>
+</g>
+<g >
+<title>0xffffe59108c4 (1 samples, 0.07%)</title><rect x="25.7" y="301" width="1.1" height="15.0" fill="rgb(245,96,45)" rx="2" ry="2" />
+<text  x="28.65" y="311.5" ></text>
+</g>
+<g >
+<title>$x (14 samples, 0.99%)</title><rect x="1544.2" y="461" width="15.6" height="15.0" fill="rgb(251,113,50)" rx="2" ry="2" />
+<text  x="1547.15" y="471.5" ></text>
+</g>
+<g >
+<title>$x (1 samples, 0.07%)</title><rect x="1552.0" y="397" width="1.1" height="15.0" fill="rgb(251,113,50)" rx="2" ry="2" />
+<text  x="1554.98" y="407.5" ></text>
+</g>
+<g >
+<title>0xffff05ad7a68 (2 samples, 0.14%)</title><rect x="1089.1" y="253" width="2.2" height="15.0" fill="rgb(232,96,30)" rx="2" ry="2" />
+<text  x="1092.05" y="263.5" ></text>
+</g>
+<g >
+<title>traceback_iretf_impl (1 samples, 0.07%)</title><rect x="1562.0" y="461" width="1.2" height="15.0" fill="rgb(238,158,36)" rx="2" ry="2" />
+<text  x="1565.05" y="471.5" ></text>
+</g>
+<g >
+<title>0xffff05b608bc (891 samples, 63.06%)</title><rect x="107.3" y="317" width="996.3" height="15.0" fill="rgb(222,96,19)" rx="2" ry="2" />
+<text  x="110.28" y="327.5" >0xffff05b608bc</text>
+</g>
+<g >
+<title>transformer_engine::cuda::current_device (1 samples, 0.07%)</title><rect x="1518.4" y="365" width="1.2" height="15.0" fill="rgb(246,158,46)" rx="2" ry="2" />
+<text  x="1521.44" y="375.5" ></text>
+</g>
+<g >
+<title>0xffff05b2289c (1 samples, 0.07%)</title><rect x="1575.5" y="381" width="1.1" height="15.0" fill="rgb(231,96,29)" rx="2" ry="2" />
+<text  x="1578.46" y="391.5" ></text>
+</g>
+<g >
+<title>0xffff05c150b0 (1 samples, 0.07%)</title><rect x="1121.5" y="285" width="1.1" height="15.0" fill="rgb(230,96,27)" rx="2" ry="2" />
+<text  x="1124.48" y="295.5" ></text>
+</g>
+<g >
+<title>0xfffefe0beb80 (1 samples, 0.07%)</title><rect x="1578.8" y="461" width="1.1" height="15.0" fill="rgb(238,96,36)" rx="2" ry="2" />
+<text  x="1581.82" y="471.5" ></text>
+</g>
+<g >
+<title>at::empty (5 samples, 0.35%)</title><rect x="1133.8" y="365" width="5.6" height="15.0" fill="rgb(243,111,42)" rx="2" ry="2" />
+<text  x="1136.78" y="375.5" ></text>
+</g>
+<g >
+<title>torch::autograd::Engine::thread_main (14 samples, 0.99%)</title><rect x="1544.2" y="429" width="15.6" height="15.0" fill="rgb(247,157,46)" rx="2" ry="2" />
+<text  x="1547.15" y="439.5" ></text>
+</g>
+<g >
+<title>$x (1 samples, 0.07%)</title><rect x="1439.0" y="173" width="1.2" height="15.0" fill="rgb(251,113,50)" rx="2" ry="2" />
+<text  x="1442.04" y="183.5" ></text>
+</g>
+<g >
+<title>at::detail::empty_cuda (1 samples, 0.07%)</title><rect x="1530.7" y="253" width="1.2" height="15.0" fill="rgb(235,111,33)" rx="2" ry="2" />
+<text  x="1533.74" y="263.5" ></text>
+</g>
+<g >
+<title>nvte_fused_attn_bwd_v2 (1 samples, 0.07%)</title><rect x="1581.1" y="429" width="1.1" height="15.0" fill="rgb(238,163,36)" rx="2" ry="2" />
+<text  x="1584.05" y="439.5" ></text>
+</g>
+<g >
+<title>0xffff05a63014 (914 samples, 64.69%)</title><rect x="82.7" y="381" width="1022.0" height="15.0" fill="rgb(246,96,45)" rx="2" ry="2" />
+<text  x="85.68" y="391.5" >0xffff05a63014</text>
+</g>
+<g >
+<title>0xfffe545df088 (1 samples, 0.07%)</title><rect x="1115.9" y="253" width="1.1" height="15.0" fill="rgb(243,96,42)" rx="2" ry="2" />
+<text  x="1118.89" y="263.5" ></text>
+</g>
+<g >
+<title>0xffff05a15678 (4 samples, 0.28%)</title><rect x="1539.7" y="445" width="4.5" height="15.0" fill="rgb(240,96,38)" rx="2" ry="2" />
+<text  x="1542.68" y="455.5" ></text>
+</g>
+<g >
+<title>c10::cuda::CUDACachingAllocator::Native::NativeCachingAllocator::get_allocated_block (1 samples, 0.07%)</title><rect x="1151.7" y="381" width="1.1" height="15.0" fill="rgb(240,132,39)" rx="2" ry="2" />
+<text  x="1154.67" y="391.5" ></text>
+</g>
+<g >
+<title>0xffff05bbe428 (40 samples, 2.83%)</title><rect x="110.6" y="301" width="44.8" height="15.0" fill="rgb(235,96,33)" rx="2" ry="2" />
+<text  x="113.64" y="311.5" >0xff..</text>
+</g>
+<g >
+<title>0xffff05bbeed4 (1 samples, 0.07%)</title><rect x="112.9" y="285" width="1.1" height="15.0" fill="rgb(246,96,46)" rx="2" ry="2" />
+<text  x="115.87" y="295.5" ></text>
+</g>
+<g >
+<title>transformer_engine::TensorAllocator::Allocate (1 samples, 0.07%)</title><rect x="1529.6" y="365" width="1.1" height="15.0" fill="rgb(245,158,45)" rx="2" ry="2" />
+<text  x="1532.62" y="375.5" ></text>
+</g>
+<g >
+<title>cudaGetDevice (1 samples, 0.07%)</title><rect x="1522.9" y="237" width="1.1" height="15.0" fill="rgb(246,109,46)" rx="2" ry="2" />
+<text  x="1525.91" y="247.5" ></text>
+</g>
+<g >
+<title>0xfffefe17dcec (1 samples, 0.07%)</title><rect x="1563.2" y="429" width="1.1" height="15.0" fill="rgb(235,96,33)" rx="2" ry="2" />
+<text  x="1566.16" y="439.5" ></text>
+</g>
+<g >
+<title>cudaGetDevice (1 samples, 0.07%)</title><rect x="1114.8" y="349" width="1.1" height="15.0" fill="rgb(246,109,46)" rx="2" ry="2" />
+<text  x="1117.77" y="359.5" ></text>
+</g>
+<g >
+<title>cuCtxGetDevice_v2 (1 samples, 0.07%)</title><rect x="1139.4" y="301" width="1.1" height="15.0" fill="rgb(238,100,36)" rx="2" ry="2" />
+<text  x="1142.37" y="311.5" ></text>
+</g>
+<g >
+<title>0xfffe546b4dd8 (1 samples, 0.07%)</title><rect x="1441.3" y="349" width="1.1" height="15.0" fill="rgb(240,96,39)" rx="2" ry="2" />
+<text  x="1444.28" y="359.5" ></text>
+</g>
+<g >
+<title>0xffff05bbe430 (4 samples, 0.28%)</title><rect x="163.2" y="301" width="4.5" height="15.0" fill="rgb(230,96,28)" rx="2" ry="2" />
+<text  x="166.19" y="311.5" ></text>
+</g>
+<g >
+<title>0xfffe709474d4 (1 samples, 0.07%)</title><rect x="81.6" y="365" width="1.1" height="15.0" fill="rgb(247,96,46)" rx="2" ry="2" />
+<text  x="84.56" y="375.5" ></text>
+</g>
+<g >
+<title>0xffffe5872dd8 (1 samples, 0.07%)</title><rect x="1138.3" y="205" width="1.1" height="15.0" fill="rgb(240,96,39)" rx="2" ry="2" />
+<text  x="1141.25" y="215.5" ></text>
+</g>
+<g >
+<title>nvte_set_fused_attn_bwd_params_attribute (1 samples, 0.07%)</title><rect x="1521.8" y="397" width="1.1" height="15.0" fill="rgb(240,163,38)" rx="2" ry="2" />
+<text  x="1524.79" y="407.5" ></text>
+</g>
+<g >
+<title>0x4b49c8 (1 samples, 0.07%)</title><rect x="27.9" y="493" width="1.1" height="15.0" fill="rgb(238,102,36)" rx="2" ry="2" />
+<text  x="30.89" y="503.5" ></text>
+</g>
+<g >
+<title>0xffffe4c6c9f8 (1 samples, 0.07%)</title><rect x="1582.2" y="429" width="1.1" height="15.0" fill="rgb(234,96,32)" rx="2" ry="2" />
+<text  x="1585.17" y="439.5" ></text>
+</g>
+<g >
+<title>c10::cuda::GetDevice (1 samples, 0.07%)</title><rect x="1126.0" y="253" width="1.1" height="15.0" fill="rgb(246,132,46)" rx="2" ry="2" />
+<text  x="1128.95" y="263.5" ></text>
+</g>
+<g >
+<title>0xffff05a003fc (1 samples, 0.07%)</title><rect x="83.8" y="285" width="1.1" height="15.0" fill="rgb(233,96,31)" rx="2" ry="2" />
+<text  x="86.80" y="295.5" ></text>
+</g>
+<g >
+<title>0xffffe4c6f164 (2 samples, 0.14%)</title><rect x="25.7" y="365" width="2.2" height="15.0" fill="rgb(239,96,38)" rx="2" ry="2" />
+<text  x="28.65" y="375.5" ></text>
+</g>
+<g >
+<title>0xfffe546ba434 (1 samples, 0.07%)</title><rect x="1572.1" y="349" width="1.1" height="15.0" fill="rgb(241,96,39)" rx="2" ry="2" />
+<text  x="1575.11" y="359.5" ></text>
+</g>
+<g >
+<title>0xfffe546c3584 (1 samples, 0.07%)</title><rect x="1139.4" y="205" width="1.1" height="15.0" fill="rgb(246,96,46)" rx="2" ry="2" />
+<text  x="1142.37" y="215.5" ></text>
+</g>
+<g >
+<title>0xffff05bbef94 (1 samples, 0.07%)</title><rect x="120.7" y="285" width="1.1" height="15.0" fill="rgb(245,96,44)" rx="2" ry="2" />
+<text  x="123.70" y="295.5" ></text>
+</g>
+<g >
+<title>0xffff05ae2edc (1 samples, 0.07%)</title><rect x="238.1" y="269" width="1.1" height="15.0" fill="rgb(234,96,32)" rx="2" ry="2" />
+<text  x="241.11" y="279.5" ></text>
+</g>
+<g >
+<title>0xffffe4c6c430 (1 samples, 0.07%)</title><rect x="1512.8" y="349" width="1.2" height="15.0" fill="rgb(230,96,28)" rx="2" ry="2" />
+<text  x="1515.85" y="359.5" ></text>
+</g>
+<g >
+<title>0xffff05bbe4b4 (47 samples, 3.33%)</title><rect x="174.4" y="301" width="52.5" height="15.0" fill="rgb(237,96,36)" rx="2" ry="2" />
+<text  x="177.37" y="311.5" >0xfff..</text>
+</g>
+<g >
+<title>0xffff05af13a8 (1 samples, 0.07%)</title><rect x="1160.6" y="365" width="1.1" height="15.0" fill="rgb(232,96,30)" rx="2" ry="2" />
+<text  x="1163.62" y="375.5" ></text>
+</g>
+<g >
+<title>transformer_engine::fused_attn::FusedAttnFwdParams::make_config (1 samples, 0.07%)</title><rect x="1118.1" y="381" width="1.1" height="15.0" fill="rgb(239,158,37)" rx="2" ry="2" />
+<text  x="1121.12" y="391.5" ></text>
+</g>
+<g >
+<title>0xffff05ad78fc (4 samples, 0.28%)</title><rect x="319.7" y="253" width="4.5" height="15.0" fill="rgb(230,96,27)" rx="2" ry="2" />
+<text  x="322.74" y="263.5" ></text>
+</g>
+<g >
+<title>nvte_destroy_tensor (2 samples, 0.14%)</title><rect x="1510.6" y="397" width="2.2" height="15.0" fill="rgb(242,163,40)" rx="2" ry="2" />
+<text  x="1513.61" y="407.5" ></text>
+</g>
+<g >
+<title>torch::autograd::Node::~Node (1 samples, 0.07%)</title><rect x="1153.9" y="301" width="1.1" height="15.0" fill="rgb(250,157,49)" rx="2" ry="2" />
+<text  x="1156.91" y="311.5" ></text>
+</g>
+<g >
+<title>0xffffe4c96a18 (3 samples, 0.21%)</title><rect x="24.5" y="429" width="3.4" height="15.0" fill="rgb(238,96,36)" rx="2" ry="2" />
+<text  x="27.54" y="439.5" ></text>
+</g>
+<g >
+<title>0xfffe546ba434 (1 samples, 0.07%)</title><rect x="1538.6" y="397" width="1.1" height="15.0" fill="rgb(241,96,39)" rx="2" ry="2" />
+<text  x="1541.56" y="407.5" ></text>
+</g>
+<g >
+<title>0xffffe49eee9c (1 samples, 0.07%)</title><rect x="23.4" y="349" width="1.1" height="15.0" fill="rgb(233,96,31)" rx="2" ry="2" />
+<text  x="26.42" y="359.5" ></text>
+</g>
+<g >
+<title>$x (1 samples, 0.07%)</title><rect x="1442.4" y="413" width="1.1" height="15.0" fill="rgb(251,113,50)" rx="2" ry="2" />
+<text  x="1445.40" y="423.5" ></text>
+</g>
+<g >
+<title>$x (1 samples, 0.07%)</title><rect x="1153.9" y="333" width="1.1" height="15.0" fill="rgb(251,113,50)" rx="2" ry="2" />
+<text  x="1156.91" y="343.5" ></text>
+</g>
+<g >
+<title>0xfffe546b4dd8 (1 samples, 0.07%)</title><rect x="1115.9" y="317" width="1.1" height="15.0" fill="rgb(240,96,39)" rx="2" ry="2" />
+<text  x="1118.89" y="327.5" ></text>
+</g>
+<g >
+<title>0x4f11d0 (1 samples, 0.07%)</title><rect x="35.7" y="493" width="1.1" height="15.0" fill="rgb(239,102,37)" rx="2" ry="2" />
+<text  x="38.72" y="503.5" ></text>
+</g>
+<g >
+<title>0xfffe546b4be4 (1 samples, 0.07%)</title><rect x="1456.9" y="381" width="1.2" height="15.0" fill="rgb(247,96,47)" rx="2" ry="2" />
+<text  x="1459.94" y="391.5" ></text>
+</g>
+<g >
+<title>0xffff05bbfab0 (1 samples, 0.07%)</title><rect x="175.5" y="285" width="1.1" height="15.0" fill="rgb(229,96,26)" rx="2" ry="2" />
+<text  x="178.49" y="295.5" ></text>
+</g>
+<g >
+<title>$x (4 samples, 0.28%)</title><rect x="1522.9" y="349" width="4.5" height="15.0" fill="rgb(251,113,50)" rx="2" ry="2" />
+<text  x="1525.91" y="359.5" ></text>
+</g>
+<g >
+<title>0xffffe4aa9984 (1 samples, 0.07%)</title><rect x="1423.4" y="445" width="1.1" height="15.0" fill="rgb(244,96,43)" rx="2" ry="2" />
+<text  x="1426.39" y="455.5" ></text>
+</g>
+<g >
+<title>0xffffe49eee0c (1 samples, 0.07%)</title><rect x="1110.3" y="349" width="1.1" height="15.0" fill="rgb(231,96,29)" rx="2" ry="2" />
+<text  x="1113.30" y="359.5" ></text>
+</g>
+<g >
+<title>transformer_engine::cuda::current_device (1 samples, 0.07%)</title><rect x="1114.8" y="365" width="1.1" height="15.0" fill="rgb(246,158,46)" rx="2" ry="2" />
+<text  x="1117.77" y="375.5" ></text>
+</g>
+<g >
+<title>0xffff05a91150 (4 samples, 0.28%)</title><rect x="1539.7" y="397" width="4.5" height="15.0" fill="rgb(230,96,28)" rx="2" ry="2" />
+<text  x="1542.68" y="407.5" ></text>
+</g>
+<g >
+<title>0xfffefe1a1098 (1 samples, 0.07%)</title><rect x="1564.3" y="429" width="1.1" height="15.0" fill="rgb(242,96,41)" rx="2" ry="2" />
+<text  x="1567.28" y="439.5" ></text>
+</g>
+<g >
+<title>NSYS_OSRT_pthread_mutex_lock_1 (1 samples, 0.07%)</title><rect x="1511.7" y="381" width="1.1" height="15.0" fill="rgb(223,119,20)" rx="2" ry="2" />
+<text  x="1514.73" y="391.5" ></text>
+</g>
+<g >
+<title>0xfffe546ba30c (1 samples, 0.07%)</title><rect x="1128.2" y="173" width="1.1" height="15.0" fill="rgb(232,96,30)" rx="2" ry="2" />
+<text  x="1131.19" y="183.5" ></text>
+</g>
+<g >
+<title>__libc_malloc (1 samples, 0.07%)</title><rect x="1426.7" y="461" width="1.2" height="15.0" fill="rgb(238,154,36)" rx="2" ry="2" />
+<text  x="1429.74" y="471.5" ></text>
+</g>
+<g >
+<title>0xfffe546ba434 (1 samples, 0.07%)</title><rect x="1581.1" y="237" width="1.1" height="15.0" fill="rgb(241,96,39)" rx="2" ry="2" />
+<text  x="1584.05" y="247.5" ></text>
+</g>
+<g >
+<title>cuCtxGetDevice_v2 (2 samples, 0.14%)</title><rect x="1546.4" y="333" width="2.2" height="15.0" fill="rgb(238,100,36)" rx="2" ry="2" />
+<text  x="1549.39" y="343.5" ></text>
+</g>
+<g >
+<title>$x (5 samples, 0.35%)</title><rect x="1140.5" y="461" width="5.6" height="15.0" fill="rgb(251,113,50)" rx="2" ry="2" />
+<text  x="1143.49" y="471.5" ></text>
+</g>
+<g >
+<title>$x (2 samples, 0.14%)</title><rect x="1527.4" y="349" width="2.2" height="15.0" fill="rgb(251,113,50)" rx="2" ry="2" />
+<text  x="1530.38" y="359.5" ></text>
+</g>
+<g >
+<title>0xffff05bbf200 (1 samples, 0.07%)</title><rect x="154.2" y="285" width="1.2" height="15.0" fill="rgb(235,96,33)" rx="2" ry="2" />
+<text  x="157.25" y="295.5" ></text>
+</g>
+<g >
+<title>0xffffe59108c4 (1 samples, 0.07%)</title><rect x="26.8" y="301" width="1.1" height="15.0" fill="rgb(245,96,45)" rx="2" ry="2" />
+<text  x="29.77" y="311.5" ></text>
+</g>
+<g >
+<title>torch::autograd::Engine::evaluate_function (5 samples, 0.35%)</title><rect x="1554.2" y="413" width="5.6" height="15.0" fill="rgb(247,157,46)" rx="2" ry="2" />
+<text  x="1557.22" y="423.5" ></text>
+</g>
+<g >
+<title>0xffffe58641d8 (1 samples, 0.07%)</title><rect x="1508.4" y="349" width="1.1" height="15.0" fill="rgb(242,96,41)" rx="2" ry="2" />
+<text  x="1511.37" y="359.5" ></text>
+</g>
+<g >
+<title>0xffff05ad78c0 (1 samples, 0.07%)</title><rect x="244.8" y="253" width="1.1" height="15.0" fill="rgb(235,96,33)" rx="2" ry="2" />
+<text  x="247.82" y="263.5" ></text>
+</g>
+<g >
+<title>0xfffff7fa057c (8 samples, 0.57%)</title><rect x="1215.4" y="461" width="9.0" height="15.0" fill="rgb(235,96,33)" rx="2" ry="2" />
+<text  x="1218.41" y="471.5" ></text>
+</g>
+<g >
+<title>0x420408 (1 samples, 0.07%)</title><rect x="1157.3" y="461" width="1.1" height="15.0" fill="rgb(237,102,35)" rx="2" ry="2" />
+<text  x="1160.26" y="471.5" ></text>
+</g>
+<g >
+<title>0xffff05bbfacc (4 samples, 0.28%)</title><rect x="177.7" y="285" width="4.5" height="15.0" fill="rgb(238,96,36)" rx="2" ry="2" />
+<text  x="180.73" y="295.5" ></text>
+</g>
+<g >
+<title>0xffff05bbe3e0 (1 samples, 0.07%)</title><rect x="108.4" y="301" width="1.1" height="15.0" fill="rgb(236,96,34)" rx="2" ry="2" />
+<text  x="111.40" y="311.5" ></text>
+</g>
+<g >
+<title>0x5a3f5c (1 samples, 0.07%)</title><rect x="61.4" y="493" width="1.2" height="15.0" fill="rgb(225,99,22)" rx="2" ry="2" />
+<text  x="64.44" y="503.5" ></text>
+</g>
+<g >
+<title>0x4f2c18 (1 samples, 0.07%)</title><rect x="38.0" y="493" width="1.1" height="15.0" fill="rgb(236,102,35)" rx="2" ry="2" />
+<text  x="40.95" y="503.5" ></text>
+</g>
+<g >
+<title>cudaGetDevice (1 samples, 0.07%)</title><rect x="1130.4" y="189" width="1.1" height="15.0" fill="rgb(246,109,46)" rx="2" ry="2" />
+<text  x="1133.42" y="199.5" ></text>
+</g>
+<g >
+<title>_PyEval_EvalFrameDefault (3 samples, 0.21%)</title><rect x="1585.5" y="493" width="3.4" height="15.0" fill="rgb(228,171,25)" rx="2" ry="2" />
+<text  x="1588.53" y="503.5" ></text>
+</g>
+<g >
+<title>$x (2 samples, 0.14%)</title><rect x="1436.8" y="365" width="2.2" height="15.0" fill="rgb(251,113,50)" rx="2" ry="2" />
+<text  x="1439.81" y="375.5" ></text>
+</g>
+<g >
+<title>0xfffe54613cdc (1 samples, 0.07%)</title><rect x="1541.9" y="253" width="1.1" height="15.0" fill="rgb(236,96,34)" rx="2" ry="2" />
+<text  x="1544.92" y="263.5" ></text>
+</g>
+<g >
+<title>0xfffe546321d0 (2 samples, 0.14%)</title><rect x="1540.8" y="269" width="2.2" height="15.0" fill="rgb(239,96,37)" rx="2" ry="2" />
+<text  x="1543.80" y="279.5" ></text>
+</g>
+<g >
+<title>0xffff05a6425c (1 samples, 0.07%)</title><rect x="1516.2" y="333" width="1.1" height="15.0" fill="rgb(228,96,25)" rx="2" ry="2" />
+<text  x="1519.20" y="343.5" ></text>
+</g>
+<g >
+<title>0xffffc7176148 (1 samples, 0.07%)</title><rect x="1139.4" y="317" width="1.1" height="15.0" fill="rgb(235,96,33)" rx="2" ry="2" />
+<text  x="1142.37" y="327.5" ></text>
+</g>
+<g >
+<title>0xfffe546b4be4 (1 samples, 0.07%)</title><rect x="1115.9" y="301" width="1.1" height="15.0" fill="rgb(247,96,47)" rx="2" ry="2" />
+<text  x="1118.89" y="311.5" ></text>
+</g>
+<g >
+<title>$x (1 samples, 0.07%)</title><rect x="1524.0" y="237" width="1.1" height="15.0" fill="rgb(251,113,50)" rx="2" ry="2" />
+<text  x="1527.03" y="247.5" ></text>
+</g>
+<g >
+<title>0xffffe4f16a54 (1 samples, 0.07%)</title><rect x="1444.6" y="381" width="1.2" height="15.0" fill="rgb(240,96,39)" rx="2" ry="2" />
+<text  x="1447.64" y="391.5" ></text>
+</g>
+<g >
+<title>0xffff05b5b440 (1 samples, 0.07%)</title><rect x="1161.7" y="365" width="1.2" height="15.0" fill="rgb(229,96,26)" rx="2" ry="2" />
+<text  x="1164.73" y="375.5" ></text>
+</g>
+<g >
+<title>operator new (1 samples, 0.07%)</title><rect x="1579.9" y="477" width="1.2" height="15.0" fill="rgb(235,195,33)" rx="2" ry="2" />
+<text  x="1582.94" y="487.5" ></text>
+</g>
+<g >
+<title>0xfffe546b4dd8 (1 samples, 0.07%)</title><rect x="1555.3" y="285" width="1.2" height="15.0" fill="rgb(240,96,39)" rx="2" ry="2" />
+<text  x="1558.34" y="295.5" ></text>
+</g>
+<g >
+<title>0xffff05ad78d0 (6 samples, 0.42%)</title><rect x="249.3" y="253" width="6.7" height="15.0" fill="rgb(234,96,32)" rx="2" ry="2" />
+<text  x="252.29" y="263.5" ></text>
+</g>
+<g >
+<title>0xfffe546ba434 (2 samples, 0.14%)</title><rect x="1540.8" y="333" width="2.2" height="15.0" fill="rgb(241,96,39)" rx="2" ry="2" />
+<text  x="1543.80" y="343.5" ></text>
+</g>
+<g >
+<title>transformer_engine::pytorch::NoneQuantizer::create_tensor (6 samples, 0.42%)</title><rect x="1133.8" y="381" width="6.7" height="15.0" fill="rgb(242,158,40)" rx="2" ry="2" />
+<text  x="1136.78" y="391.5" ></text>
+</g>
+<g >
+<title>0xffff05bbe42c (7 samples, 0.50%)</title><rect x="155.4" y="301" width="7.8" height="15.0" fill="rgb(229,96,27)" rx="2" ry="2" />
+<text  x="158.36" y="311.5" ></text>
+</g>
+<g >
+<title>0xfffe546b4dd8 (1 samples, 0.07%)</title><rect x="1581.1" y="269" width="1.1" height="15.0" fill="rgb(240,96,39)" rx="2" ry="2" />
+<text  x="1584.05" y="279.5" ></text>
+</g>
+<g >
+<title>PyUnicode_RichCompare (1 samples, 0.07%)</title><rect x="77.1" y="493" width="1.1" height="15.0" fill="rgb(248,226,47)" rx="2" ry="2" />
+<text  x="80.09" y="503.5" ></text>
+</g>
+<g >
+<title>0xffffe4b9f85c (1 samples, 0.07%)</title><rect x="1461.4" y="413" width="1.1" height="15.0" fill="rgb(223,96,20)" rx="2" ry="2" />
+<text  x="1464.41" y="423.5" ></text>
+</g>
+<g >
+<title>at::native::empty_cuda (2 samples, 0.14%)</title><rect x="1527.4" y="285" width="2.2" height="15.0" fill="rgb(235,111,33)" rx="2" ry="2" />
+<text  x="1530.38" y="295.5" ></text>
+</g>
+<g >
+<title>0xfffe546b4dd8 (1 samples, 0.07%)</title><rect x="1128.2" y="221" width="1.1" height="15.0" fill="rgb(240,96,39)" rx="2" ry="2" />
+<text  x="1131.19" y="231.5" ></text>
+</g>
+<g >
+<title>0xffff05ad7950 (4 samples, 0.28%)</title><rect x="518.8" y="253" width="4.4" height="15.0" fill="rgb(224,96,21)" rx="2" ry="2" />
+<text  x="521.78" y="263.5" ></text>
+</g>
+<g >
+<title>0xffffe5862a4c (1 samples, 0.07%)</title><rect x="1426.7" y="429" width="1.2" height="15.0" fill="rgb(229,96,27)" rx="2" ry="2" />
+<text  x="1429.74" y="439.5" ></text>
+</g>
+<g >
+<title>0xffffe49e3a18 (1 samples, 0.07%)</title><rect x="1443.5" y="413" width="1.1" height="15.0" fill="rgb(238,96,36)" rx="2" ry="2" />
+<text  x="1446.52" y="423.5" ></text>
+</g>
+<g >
+<title>$x (1 samples, 0.07%)</title><rect x="1552.0" y="381" width="1.1" height="15.0" fill="rgb(251,113,50)" rx="2" ry="2" />
+<text  x="1554.98" y="391.5" ></text>
+</g>
+<g >
+<title>$x (1 samples, 0.07%)</title><rect x="1126.0" y="285" width="1.1" height="15.0" fill="rgb(251,113,50)" rx="2" ry="2" />
+<text  x="1128.95" y="295.5" ></text>
+</g>
+<g >
+<title>0xffff05ad52dc (1 samples, 0.07%)</title><rect x="1162.9" y="349" width="1.1" height="15.0" fill="rgb(236,96,35)" rx="2" ry="2" />
+<text  x="1165.85" y="359.5" ></text>
+</g>
+<g >
+<title>0x5867d0 (1 samples, 0.07%)</title><rect x="59.2" y="493" width="1.1" height="15.0" fill="rgb(235,99,33)" rx="2" ry="2" />
+<text  x="62.20" y="503.5" ></text>
+</g>
+<g >
+<title>0xfff8e8c01b88 (1 samples, 0.07%)</title><rect x="1455.8" y="445" width="1.1" height="15.0" fill="rgb(242,96,40)" rx="2" ry="2" />
+<text  x="1458.82" y="455.5" ></text>
+</g>
+<g >
+<title>$x (1 samples, 0.07%)</title><rect x="1560.9" y="461" width="1.1" height="15.0" fill="rgb(251,113,50)" rx="2" ry="2" />
+<text  x="1563.93" y="471.5" ></text>
+</g>
+<g >
+<title>0x58b828 (1 samples, 0.07%)</title><rect x="1157.3" y="477" width="1.1" height="15.0" fill="rgb(232,99,30)" rx="2" ry="2" />
+<text  x="1160.26" y="487.5" ></text>
+</g>
+<g >
+<title>c10::cuda::SetDevice (3 samples, 0.21%)</title><rect x="1545.3" y="381" width="3.3" height="15.0" fill="rgb(246,132,46)" rx="2" ry="2" />
+<text  x="1548.27" y="391.5" ></text>
+</g>
+<g >
+<title>0x5142e0 (1 samples, 0.07%)</title><rect x="48.0" y="493" width="1.1" height="15.0" fill="rgb(237,99,35)" rx="2" ry="2" />
+<text  x="51.02" y="503.5" ></text>
+</g>
+<g >
+<title>transformer_engine::cuda::current_device (2 samples, 0.14%)</title><rect x="1115.9" y="365" width="2.2" height="15.0" fill="rgb(246,158,46)" rx="2" ry="2" />
+<text  x="1118.89" y="375.5" ></text>
+</g>
+<g >
+<title>_PyObject_GenericGetAttrWithDict (1 samples, 0.07%)</title><rect x="1560.9" y="477" width="1.1" height="15.0" fill="rgb(238,171,36)" rx="2" ry="2" />
+<text  x="1563.93" y="487.5" ></text>
+</g>
+<g >
+<title>$x (3 samples, 0.21%)</title><rect x="1436.8" y="397" width="3.4" height="15.0" fill="rgb(251,113,50)" rx="2" ry="2" />
+<text  x="1439.81" y="407.5" ></text>
+</g>
+<g >
+<title>$x (1 samples, 0.07%)</title><rect x="1439.0" y="269" width="1.2" height="15.0" fill="rgb(251,113,50)" rx="2" ry="2" />
+<text  x="1442.04" y="279.5" ></text>
+</g>
+<g >
+<title>0xfffe546ba268 (1 samples, 0.07%)</title><rect x="1129.3" y="109" width="1.1" height="15.0" fill="rgb(232,96,29)" rx="2" ry="2" />
+<text  x="1132.31" y="119.5" ></text>
+</g>
+<g >
+<title>0xffffe4bc2bbc (1 samples, 0.07%)</title><rect x="1535.2" y="461" width="1.1" height="15.0" fill="rgb(226,96,24)" rx="2" ry="2" />
+<text  x="1538.21" y="471.5" ></text>
+</g>
+<g >
+<title>at::_ops::empty_memory_format::call (4 samples, 0.28%)</title><rect x="1522.9" y="365" width="4.5" height="15.0" fill="rgb(230,111,28)" rx="2" ry="2" />
+<text  x="1525.91" y="375.5" ></text>
+</g>
+<g >
+<title>0xfffe546ba268 (1 samples, 0.07%)</title><rect x="1143.8" y="285" width="1.2" height="15.0" fill="rgb(232,96,29)" rx="2" ry="2" />
+<text  x="1146.84" y="295.5" ></text>
+</g>
+<g >
+<title>0xfffe546b4dd8 (1 samples, 0.07%)</title><rect x="1114.8" y="285" width="1.1" height="15.0" fill="rgb(240,96,39)" rx="2" ry="2" />
+<text  x="1117.77" y="295.5" ></text>
+</g>
+<g >
+<title>c10::cuda::GetDevice (1 samples, 0.07%)</title><rect x="1130.4" y="205" width="1.1" height="15.0" fill="rgb(246,132,46)" rx="2" ry="2" />
+<text  x="1133.42" y="215.5" ></text>
+</g>
+<g >
+<title>at::native::empty_cuda (3 samples, 0.21%)</title><rect x="1524.0" y="285" width="3.4" height="15.0" fill="rgb(235,111,33)" rx="2" ry="2" />
+<text  x="1527.03" y="295.5" ></text>
+</g>
+<g >
+<title>0xffff05ae30a0 (1 samples, 0.07%)</title><rect x="1101.4" y="269" width="1.1" height="15.0" fill="rgb(231,96,28)" rx="2" ry="2" />
+<text  x="1104.35" y="279.5" ></text>
+</g>
+<g >
+<title>at::accelerator::isAccelerator (1 samples, 0.07%)</title><rect x="1558.7" y="381" width="1.1" height="15.0" fill="rgb(241,111,39)" rx="2" ry="2" />
+<text  x="1561.69" y="391.5" ></text>
+</g>
+<g >
+<title>0xffffe585a4c4 (1 samples, 0.07%)</title><rect x="25.7" y="317" width="1.1" height="15.0" fill="rgb(248,96,48)" rx="2" ry="2" />
+<text  x="28.65" y="327.5" ></text>
+</g>
+<g >
+<title>0xffff05bff0e0 (1 samples, 0.07%)</title><rect x="1541.9" y="221" width="1.1" height="15.0" fill="rgb(238,96,37)" rx="2" ry="2" />
+<text  x="1544.92" y="231.5" ></text>
+</g>
+<g >
+<title>0xfffe546b4dd8 (1 samples, 0.07%)</title><rect x="1517.3" y="285" width="1.1" height="15.0" fill="rgb(240,96,39)" rx="2" ry="2" />
+<text  x="1520.32" y="295.5" ></text>
+</g>
+<g >
+<title>cudaGetDevice (1 samples, 0.07%)</title><rect x="1517.3" y="349" width="1.1" height="15.0" fill="rgb(246,109,46)" rx="2" ry="2" />
+<text  x="1520.32" y="359.5" ></text>
+</g>
+<g >
+<title>0xffffe49e3a58 (1 samples, 0.07%)</title><rect x="1110.3" y="365" width="1.1" height="15.0" fill="rgb(233,96,31)" rx="2" ry="2" />
+<text  x="1113.30" y="375.5" ></text>
+</g>
+<g >
+<title>at::functionalization::impl::setFunctionalizationReapplyViewsTLS (1 samples, 0.07%)</title><rect x="1553.1" y="397" width="1.1" height="15.0" fill="rgb(238,111,37)" rx="2" ry="2" />
+<text  x="1556.10" y="407.5" ></text>
+</g>
+<g >
+<title>at::_ops::as_strided::call (1 samples, 0.07%)</title><rect x="1439.0" y="189" width="1.2" height="15.0" fill="rgb(230,111,28)" rx="2" ry="2" />
+<text  x="1442.04" y="199.5" ></text>
+</g>
+<g >
+<title>0x56255c (1 samples, 0.07%)</title><rect x="54.7" y="493" width="1.1" height="15.0" fill="rgb(225,99,23)" rx="2" ry="2" />
+<text  x="57.73" y="503.5" ></text>
+</g>
+<g >
+<title>0xffff05a63c44 (1 samples, 0.07%)</title><rect x="1546.4" y="317" width="1.1" height="15.0" fill="rgb(240,96,39)" rx="2" ry="2" />
+<text  x="1549.39" y="327.5" ></text>
+</g>
+<g >
+<title>0xffffc428d8a8 (1 samples, 0.07%)</title><rect x="1565.4" y="429" width="1.1" height="15.0" fill="rgb(229,96,26)" rx="2" ry="2" />
+<text  x="1568.40" y="439.5" ></text>
+</g>
+<g >
+<title>0xffffe49ee908 (1 samples, 0.07%)</title><rect x="1536.3" y="429" width="1.1" height="15.0" fill="rgb(233,96,31)" rx="2" ry="2" />
+<text  x="1539.33" y="439.5" ></text>
+</g>
+<g >
+<title>0xffff05bbfb08 (1 samples, 0.07%)</title><rect x="188.9" y="285" width="1.1" height="15.0" fill="rgb(238,96,37)" rx="2" ry="2" />
+<text  x="191.91" y="295.5" ></text>
+</g>
+<g >
+<title>0xffff05c150b0 (1 samples, 0.07%)</title><rect x="1572.1" y="397" width="1.1" height="15.0" fill="rgb(230,96,27)" rx="2" ry="2" />
+<text  x="1575.11" y="407.5" ></text>
+</g>
+<g >
+<title>0xfffe546b4be4 (1 samples, 0.07%)</title><rect x="1441.3" y="333" width="1.1" height="15.0" fill="rgb(247,96,47)" rx="2" ry="2" />
+<text  x="1444.28" y="343.5" ></text>
+</g>
+<g >
+<title>0xfffe546b4be4 (1 samples, 0.07%)</title><rect x="1139.4" y="253" width="1.1" height="15.0" fill="rgb(247,96,47)" rx="2" ry="2" />
+<text  x="1142.37" y="263.5" ></text>
+</g>
+<g >
+<title>cuCtxGetDevice_v2 (1 samples, 0.07%)</title><rect x="1555.3" y="317" width="1.2" height="15.0" fill="rgb(238,100,36)" rx="2" ry="2" />
+<text  x="1558.34" y="327.5" ></text>
+</g>
+<g >
+<title>cudaGetDevice (1 samples, 0.07%)</title><rect x="1530.7" y="173" width="1.2" height="15.0" fill="rgb(246,109,46)" rx="2" ry="2" />
+<text  x="1533.74" y="183.5" ></text>
+</g>
+<g >
+<title>cudnn::cnn::EngineInterface::execute (14 samples, 0.99%)</title><rect x="1563.2" y="477" width="15.6" height="15.0" fill="rgb(240,109,38)" rx="2" ry="2" />
+<text  x="1566.16" y="487.5" ></text>
+</g>
+<g >
+<title>0xfffe546ba268 (1 samples, 0.07%)</title><rect x="1555.3" y="237" width="1.2" height="15.0" fill="rgb(232,96,29)" rx="2" ry="2" />
+<text  x="1558.34" y="247.5" ></text>
+</g>
+<g >
+<title>__pthread_rwlock_tryrdlock (1 samples, 0.07%)</title><rect x="1524.0" y="141" width="1.1" height="15.0" fill="rgb(240,141,39)" rx="2" ry="2" />
+<text  x="1527.03" y="151.5" ></text>
+</g>
+<g >
+<title>0xfff8e8c008d8 (2 samples, 0.14%)</title><rect x="1563.2" y="445" width="2.2" height="15.0" fill="rgb(237,96,36)" rx="2" ry="2" />
+<text  x="1566.16" y="455.5" ></text>
+</g>
+<g >
+<title>0xfffefe1477fc (1 samples, 0.07%)</title><rect x="1563.2" y="413" width="1.1" height="15.0" fill="rgb(231,96,28)" rx="2" ry="2" />
+<text  x="1566.16" y="423.5" ></text>
+</g>
+<g >
+<title>transformer_engine::fused_attn::fused_attn_arbitrary_seqlen_fwd_impl (4 samples, 0.28%)</title><rect x="1119.2" y="365" width="4.5" height="15.0" fill="rgb(238,158,36)" rx="2" ry="2" />
+<text  x="1122.24" y="375.5" ></text>
+</g>
+<g >
+<title>0xffff05bf87d8 (1 samples, 0.07%)</title><rect x="1547.5" y="301" width="1.1" height="15.0" fill="rgb(238,96,36)" rx="2" ry="2" />
+<text  x="1550.51" y="311.5" ></text>
+</g>
+<g >
+<title>0xffff05ad7a8c (2 samples, 0.14%)</title><rect x="1096.9" y="253" width="2.2" height="15.0" fill="rgb(237,96,35)" rx="2" ry="2" />
+<text  x="1099.88" y="263.5" ></text>
+</g>
+<g >
+<title>$x (1 samples, 0.07%)</title><rect x="1129.3" y="221" width="1.1" height="15.0" fill="rgb(251,113,50)" rx="2" ry="2" />
+<text  x="1132.31" y="231.5" ></text>
+</g>
+<g >
+<title>at::_ops::empty_memory_format::call (1 samples, 0.07%)</title><rect x="1530.7" y="349" width="1.2" height="15.0" fill="rgb(230,111,28)" rx="2" ry="2" />
+<text  x="1533.74" y="359.5" ></text>
+</g>
+<g >
+<title>0x4c6888 (1 samples, 0.07%)</title><rect x="29.0" y="493" width="1.1" height="15.0" fill="rgb(237,102,36)" rx="2" ry="2" />
+<text  x="32.01" y="503.5" ></text>
+</g>
+<g >
+<title>0xffff05a018d8 (1 samples, 0.07%)</title><rect x="1576.6" y="365" width="1.1" height="15.0" fill="rgb(237,96,36)" rx="2" ry="2" />
+<text  x="1579.58" y="375.5" ></text>
+</g>
+<g >
+<title>0xfffff7fa0560 (1 samples, 0.07%)</title><rect x="1166.2" y="461" width="1.1" height="15.0" fill="rgb(226,96,23)" rx="2" ry="2" />
+<text  x="1169.21" y="471.5" ></text>
+</g>
+<g >
+<title>at::detail::empty_generic (4 samples, 0.28%)</title><rect x="1134.9" y="221" width="4.5" height="15.0" fill="rgb(228,111,25)" rx="2" ry="2" />
+<text  x="1137.90" y="231.5" ></text>
+</g>
+<g >
+<title>0x5142b8 (1 samples, 0.07%)</title><rect x="46.9" y="493" width="1.1" height="15.0" fill="rgb(232,99,29)" rx="2" ry="2" />
+<text  x="49.90" y="503.5" ></text>
+</g>
+<g >
+<title>cuCtxGetCurrent (1 samples, 0.07%)</title><rect x="1516.2" y="349" width="1.1" height="15.0" fill="rgb(241,100,39)" rx="2" ry="2" />
+<text  x="1519.20" y="359.5" ></text>
+</g>
+<g >
+<title>PyObject_SetAttr (1 samples, 0.07%)</title><rect x="1429.0" y="477" width="1.1" height="15.0" fill="rgb(235,207,33)" rx="2" ry="2" />
+<text  x="1431.98" y="487.5" ></text>
+</g>
+<g >
+<title>0xfff8e8c000e0 (3 samples, 0.21%)</title><rect x="1563.2" y="461" width="3.3" height="15.0" fill="rgb(238,96,37)" rx="2" ry="2" />
+<text  x="1566.16" y="471.5" ></text>
+</g>
+<g >
+<title>0xffff05c14fc0 (1 samples, 0.07%)</title><rect x="1434.6" y="381" width="1.1" height="15.0" fill="rgb(236,96,35)" rx="2" ry="2" />
+<text  x="1437.57" y="391.5" ></text>
+</g>
+<g >
+<title>0x61cd60 (1 samples, 0.07%)</title><rect x="1448.0" y="461" width="1.1" height="15.0" fill="rgb(227,96,24)" rx="2" ry="2" />
+<text  x="1450.99" y="471.5" ></text>
+</g>
+<g >
+<title>PyObject_Hash (1 samples, 0.07%)</title><rect x="68.1" y="493" width="1.2" height="15.0" fill="rgb(241,207,40)" rx="2" ry="2" />
+<text  x="71.15" y="503.5" ></text>
+</g>
+<g >
+<title>_PyObject_LookupSpecial (1 samples, 0.07%)</title><rect x="1499.4" y="493" width="1.1" height="15.0" fill="rgb(224,171,21)" rx="2" ry="2" />
+<text  x="1502.43" y="503.5" ></text>
+</g>
+<g >
+<title>0xffffe4f16a6c (1 samples, 0.07%)</title><rect x="1582.2" y="397" width="1.1" height="15.0" fill="rgb(227,96,24)" rx="2" ry="2" />
+<text  x="1585.17" y="407.5" ></text>
+</g>
+<g >
+<title>$x (3 samples, 0.21%)</title><rect x="1128.2" y="349" width="3.3" height="15.0" fill="rgb(251,113,50)" rx="2" ry="2" />
+<text  x="1131.19" y="359.5" ></text>
+</g>
+<g >
+<title>NSYS_OSRT_pthread_mutex_lock_1 (1 samples, 0.07%)</title><rect x="1575.5" y="365" width="1.1" height="15.0" fill="rgb(223,119,20)" rx="2" ry="2" />
+<text  x="1578.46" y="375.5" ></text>
+</g>
+<g >
+<title>0xffff05ad78e4 (10 samples, 0.71%)</title><rect x="280.6" y="253" width="11.2" height="15.0" fill="rgb(243,96,42)" rx="2" ry="2" />
+<text  x="283.60" y="263.5" ></text>
+</g>
+<g >
+<title>0xffffe4c6a830 (1 samples, 0.07%)</title><rect x="1110.3" y="333" width="1.1" height="15.0" fill="rgb(227,96,25)" rx="2" ry="2" />
+<text  x="1113.30" y="343.5" ></text>
+</g>
+<g >
+<title>at::_ops::empty_memory_format::redispatch (1 samples, 0.07%)</title><rect x="1530.7" y="317" width="1.2" height="15.0" fill="rgb(242,111,41)" rx="2" ry="2" />
+<text  x="1533.74" y="327.5" ></text>
+</g>
+<g >
+<title>0xfffe546ba268 (1 samples, 0.07%)</title><rect x="1545.3" y="285" width="1.1" height="15.0" fill="rgb(232,96,29)" rx="2" ry="2" />
+<text  x="1548.27" y="295.5" ></text>
+</g>
+<g >
+<title>0xffffe49e9ec4 (1 samples, 0.07%)</title><rect x="1536.3" y="445" width="1.1" height="15.0" fill="rgb(248,96,47)" rx="2" ry="2" />
+<text  x="1539.33" y="455.5" ></text>
+</g>
+<g >
+<title>nvte_tensor_pack_destroy (1 samples, 0.07%)</title><rect x="1123.7" y="397" width="1.1" height="15.0" fill="rgb(247,163,47)" rx="2" ry="2" />
+<text  x="1126.72" y="407.5" ></text>
+</g>
+<g >
+<title>0x4dfd90 (1 samples, 0.07%)</title><rect x="1150.6" y="461" width="1.1" height="15.0" fill="rgb(236,102,34)" rx="2" ry="2" />
+<text  x="1153.55" y="471.5" ></text>
+</g>
+<g >
+<title>c10::cuda::ExchangeDevice (1 samples, 0.07%)</title><rect x="1530.7" y="189" width="1.2" height="15.0" fill="rgb(246,132,46)" rx="2" ry="2" />
+<text  x="1533.74" y="199.5" ></text>
+</g>
+<g >
+<title>$x (1 samples, 0.07%)</title><rect x="1439.0" y="349" width="1.2" height="15.0" fill="rgb(251,113,50)" rx="2" ry="2" />
+<text  x="1442.04" y="359.5" ></text>
+</g>
+<g >
+<title>0xffff05b99968 (1 samples, 0.07%)</title><rect x="1539.7" y="365" width="1.1" height="15.0" fill="rgb(227,96,24)" rx="2" ry="2" />
+<text  x="1542.68" y="375.5" ></text>
+</g>
+<g >
+<title>pybind11::detail::type_caster_enum_type&lt;&gt;::load (1 samples, 0.07%)</title><rect x="1533.0" y="429" width="1.1" height="15.0" fill="rgb(243,207,41)" rx="2" ry="2" />
+<text  x="1535.97" y="439.5" ></text>
+</g>
+<g >
+<title>0xfffe546ba268 (1 samples, 0.07%)</title><rect x="1114.8" y="237" width="1.1" height="15.0" fill="rgb(232,96,29)" rx="2" ry="2" />
+<text  x="1117.77" y="247.5" ></text>
+</g>
+<g >
+<title>torch::autograd::registerFunctionPreHook (1 samples, 0.07%)</title><rect x="1450.2" y="461" width="1.1" height="15.0" fill="rgb(239,157,38)" rx="2" ry="2" />
+<text  x="1453.23" y="471.5" ></text>
+</g>
+<g >
+<title>pybind11::cpp_function::dispatcher (28 samples, 1.98%)</title><rect x="1109.2" y="461" width="31.3" height="15.0" fill="rgb(240,207,38)" rx="2" ry="2" />
+<text  x="1112.18" y="471.5" >py..</text>
+</g>
+<g >
+<title>torch::PythonArgParser::raw_parse (1 samples, 0.07%)</title><rect x="1145.0" y="445" width="1.1" height="15.0" fill="rgb(243,157,42)" rx="2" ry="2" />
+<text  x="1147.96" y="455.5" ></text>
+</g>
+<g >
+<title>0xffff05ad790c (4 samples, 0.28%)</title><rect x="347.7" y="253" width="4.5" height="15.0" fill="rgb(228,96,26)" rx="2" ry="2" />
+<text  x="350.69" y="263.5" ></text>
+</g>
+<g >
+<title>pybind11::cpp_function::initialize&lt;&gt;::{lambda()#1}::_FUN (2 samples, 0.14%)</title><rect x="1443.5" y="445" width="2.3" height="15.0" fill="rgb(225,207,22)" rx="2" ry="2" />
+<text  x="1446.52" y="455.5" ></text>
+</g>
+<g >
+<title>_PyObject_GenericGetAttrWithDict (2 samples, 0.14%)</title><rect x="1496.1" y="493" width="2.2" height="15.0" fill="rgb(238,171,36)" rx="2" ry="2" />
+<text  x="1499.07" y="503.5" ></text>
+</g>
+<g >
+<title>0xffff05b7764c (1 samples, 0.07%)</title><rect x="1162.9" y="301" width="1.1" height="15.0" fill="rgb(226,96,23)" rx="2" ry="2" />
+<text  x="1165.85" y="311.5" ></text>
+</g>
+<g >
+<title>0xffff05bbef9c (1 samples, 0.07%)</title><rect x="124.1" y="285" width="1.1" height="15.0" fill="rgb(232,96,30)" rx="2" ry="2" />
+<text  x="127.06" y="295.5" ></text>
+</g>
+<g >
+<title>__pthread_mutex_trylock (1 samples, 0.07%)</title><rect x="1575.5" y="349" width="1.1" height="15.0" fill="rgb(240,141,39)" rx="2" ry="2" />
+<text  x="1578.46" y="359.5" ></text>
+</g>
+<g >
+<title>0xfff8e8c05af8 (1 samples, 0.07%)</title><rect x="1576.6" y="461" width="1.1" height="15.0" fill="rgb(240,96,39)" rx="2" ry="2" />
+<text  x="1579.58" y="471.5" ></text>
+</g>
+<g >
+<title>0xfff8e8c0149c (1 samples, 0.07%)</title><rect x="1575.5" y="445" width="1.1" height="15.0" fill="rgb(234,96,32)" rx="2" ry="2" />
+<text  x="1578.46" y="455.5" ></text>
+</g>
+<g >
+<title>PyUFunc_GenericReduction (4 samples, 0.28%)</title><rect x="1104.7" y="461" width="4.5" height="15.0" fill="rgb(247,226,46)" rx="2" ry="2" />
+<text  x="1107.71" y="471.5" ></text>
+</g>
+<g >
+<title>cudnn::backend::VariantPack::set_internal (1 samples, 0.07%)</title><rect x="1452.5" y="477" width="1.1" height="15.0" fill="rgb(229,109,27)" rx="2" ry="2" />
+<text  x="1455.46" y="487.5" ></text>
+</g>
+<g >
+<title>0xffff05bbfac0 (1 samples, 0.07%)</title><rect x="176.6" y="285" width="1.1" height="15.0" fill="rgb(240,96,38)" rx="2" ry="2" />
+<text  x="179.61" y="295.5" ></text>
+</g>
+<g >
+<title>0xffffe4d41d80 (1 samples, 0.07%)</title><rect x="1535.2" y="429" width="1.1" height="15.0" fill="rgb(237,96,35)" rx="2" ry="2" />
+<text  x="1538.21" y="439.5" ></text>
+</g>
+<g >
+<title>0xfffff7fa0850 (232 samples, 16.42%)</title><rect x="1164.0" y="477" width="259.4" height="15.0" fill="rgb(225,96,22)" rx="2" ry="2" />
+<text  x="1166.97" y="487.5" >0xfffff7fa0850</text>
+</g>
+<g >
+<title>0xffff05b608ac (17 samples, 1.20%)</title><rect x="87.2" y="317" width="19.0" height="15.0" fill="rgb(223,96,20)" rx="2" ry="2" />
+<text  x="90.15" y="327.5" ></text>
+</g>
+<g >
+<title>0xffff05b1e600 (1 samples, 0.07%)</title><rect x="1162.9" y="381" width="1.1" height="15.0" fill="rgb(232,96,30)" rx="2" ry="2" />
+<text  x="1165.85" y="391.5" ></text>
+</g>
+<g >
+<title>0xfff8e8c01184 (2 samples, 0.14%)</title><rect x="1455.8" y="461" width="2.3" height="15.0" fill="rgb(249,96,49)" rx="2" ry="2" />
+<text  x="1458.82" y="471.5" ></text>
+</g>
+<g >
+<title>0x503120 (1 samples, 0.07%)</title><rect x="1559.8" y="461" width="1.1" height="15.0" fill="rgb(233,99,31)" rx="2" ry="2" />
+<text  x="1562.81" y="471.5" ></text>
+</g>
+<g >
+<title>at::_ops::empty_memory_format::redispatch (4 samples, 0.28%)</title><rect x="1522.9" y="333" width="4.5" height="15.0" fill="rgb(242,111,41)" rx="2" ry="2" />
+<text  x="1525.91" y="343.5" ></text>
+</g>
+<g >
+<title>0xffff05ad7924 (71 samples, 5.02%)</title><rect x="401.4" y="253" width="79.4" height="15.0" fill="rgb(238,96,37)" rx="2" ry="2" />
+<text  x="404.37" y="263.5" >0xffff05a..</text>
+</g>
+<g >
+<title>0xffffe49e3a20 (1 samples, 0.07%)</title><rect x="1444.6" y="413" width="1.2" height="15.0" fill="rgb(233,96,31)" rx="2" ry="2" />
+<text  x="1447.64" y="423.5" ></text>
+</g>
+<g >
+<title>0xffff05c150b0 (1 samples, 0.07%)</title><rect x="1545.3" y="349" width="1.1" height="15.0" fill="rgb(230,96,27)" rx="2" ry="2" />
+<text  x="1548.27" y="359.5" ></text>
+</g>
+<g >
+<title>0xffffe4c6a82c (1 samples, 0.07%)</title><rect x="1158.4" y="429" width="1.1" height="15.0" fill="rgb(227,96,24)" rx="2" ry="2" />
+<text  x="1161.38" y="439.5" ></text>
+</g>
+<g >
+<title>c10::TensorImpl::shallow_copy_and_detach (1 samples, 0.07%)</title><rect x="1560.9" y="413" width="1.1" height="15.0" fill="rgb(247,132,46)" rx="2" ry="2" />
+<text  x="1563.93" y="423.5" ></text>
+</g>
+<g >
+<title>0xffffe49ece9c (1 samples, 0.07%)</title><rect x="23.4" y="397" width="1.1" height="15.0" fill="rgb(233,96,31)" rx="2" ry="2" />
+<text  x="26.42" y="407.5" ></text>
+</g>
+<g >
+<title>$x (2 samples, 0.14%)</title><rect x="1152.8" y="397" width="2.2" height="15.0" fill="rgb(251,113,50)" rx="2" ry="2" />
+<text  x="1155.79" y="407.5" ></text>
+</g>
+<g >
+<title>0xfff8e8c01ba8 (1 samples, 0.07%)</title><rect x="1456.9" y="445" width="1.2" height="15.0" fill="rgb(233,96,31)" rx="2" ry="2" />
+<text  x="1459.94" y="455.5" ></text>
+</g>
+<g >
+<title>c10::TensorImpl::~TensorImpl (1 samples, 0.07%)</title><rect x="1508.4" y="381" width="1.1" height="15.0" fill="rgb(238,132,36)" rx="2" ry="2" />
+<text  x="1511.37" y="391.5" ></text>
+</g>
+<g >
+<title>PyArray_MultiplyList (1 samples, 0.07%)</title><rect x="1106.9" y="429" width="1.2" height="15.0" fill="rgb(232,213,30)" rx="2" ry="2" />
+<text  x="1109.94" y="439.5" ></text>
+</g>
+<g >
+<title>0xffff05ad78ec (11 samples, 0.78%)</title><rect x="304.1" y="253" width="12.3" height="15.0" fill="rgb(231,96,29)" rx="2" ry="2" />
+<text  x="307.08" y="263.5" ></text>
+</g>
+<g >
+<title>reducelike_promote_and_resolve (1 samples, 0.07%)</title><rect x="1108.1" y="445" width="1.1" height="15.0" fill="rgb(244,175,43)" rx="2" ry="2" />
+<text  x="1111.06" y="455.5" ></text>
+</g>
+<g >
+<title>0xfffe546ba434 (1 samples, 0.07%)</title><rect x="1129.3" y="125" width="1.1" height="15.0" fill="rgb(241,96,39)" rx="2" ry="2" />
+<text  x="1132.31" y="135.5" ></text>
+</g>
+<g >
+<title>cuLaunchKernelEx (3 samples, 0.21%)</title><rect x="1160.6" y="461" width="3.4" height="15.0" fill="rgb(251,109,51)" rx="2" ry="2" />
+<text  x="1163.62" y="471.5" ></text>
+</g>
+<g >
+<title>cudnn_frontend::graph::Execution_plan_list::is_plan_index_executable (1 samples, 0.07%)</title><rect x="1120.4" y="317" width="1.1" height="15.0" fill="rgb(241,109,40)" rx="2" ry="2" />
+<text  x="1123.36" y="327.5" ></text>
+</g>
+<g >
+<title>cudaGetDevice (2 samples, 0.14%)</title><rect x="1434.6" y="397" width="2.2" height="15.0" fill="rgb(246,109,46)" rx="2" ry="2" />
+<text  x="1437.57" y="407.5" ></text>
+</g>
+<g >
+<title>cudaGetDevice (3 samples, 0.21%)</title><rect x="1545.3" y="365" width="3.3" height="15.0" fill="rgb(246,109,46)" rx="2" ry="2" />
+<text  x="1548.27" y="375.5" ></text>
+</g>
+<g >
+<title>$x (2 samples, 0.14%)</title><rect x="1142.7" y="397" width="2.3" height="15.0" fill="rgb(251,113,50)" rx="2" ry="2" />
+<text  x="1145.72" y="407.5" ></text>
+</g>
+<g >
+<title>$x (3 samples, 0.21%)</title><rect x="1151.7" y="461" width="3.3" height="15.0" fill="rgb(251,113,50)" rx="2" ry="2" />
+<text  x="1154.67" y="471.5" ></text>
+</g>
+<g >
+<title>0xffffe4aa9984 (1 samples, 0.07%)</title><rect x="1158.4" y="445" width="1.1" height="15.0" fill="rgb(244,96,43)" rx="2" ry="2" />
+<text  x="1161.38" y="455.5" ></text>
+</g>
+<g >
+<title>at::accelerator::getAccelerator (1 samples, 0.07%)</title><rect x="1556.5" y="381" width="1.1" height="15.0" fill="rgb(241,111,39)" rx="2" ry="2" />
+<text  x="1559.45" y="391.5" ></text>
+</g>
+<g >
+<title>std::_Hashtable&lt;&gt;::_Hashtable&lt;&gt; (1 samples, 0.07%)</title><rect x="1519.6" y="349" width="1.1" height="15.0" fill="rgb(242,146,41)" rx="2" ry="2" />
+<text  x="1522.55" y="359.5" ></text>
+</g>
+<g >
+<title>0xffffe51448d4 (3 samples, 0.21%)</title><rect x="24.5" y="445" width="3.4" height="15.0" fill="rgb(244,96,43)" rx="2" ry="2" />
+<text  x="27.54" y="455.5" ></text>
+</g>
+<g >
+<title>transformer_engine::pytorch::fused_attn_bwd (1 samples, 0.07%)</title><rect x="1581.1" y="445" width="1.1" height="15.0" fill="rgb(243,158,42)" rx="2" ry="2" />
+<text  x="1584.05" y="455.5" ></text>
+</g>
+<g >
+<title>__libc_free (1 samples, 0.07%)</title><rect x="1453.6" y="429" width="1.1" height="15.0" fill="rgb(246,154,46)" rx="2" ry="2" />
+<text  x="1456.58" y="439.5" ></text>
+</g>
+<g >
+<title>0xfffe7088b238 (1 samples, 0.07%)</title><rect x="80.4" y="333" width="1.2" height="15.0" fill="rgb(235,96,33)" rx="2" ry="2" />
+<text  x="83.45" y="343.5" ></text>
+</g>
+<g >
+<title>$x (1 samples, 0.07%)</title><rect x="1530.7" y="285" width="1.2" height="15.0" fill="rgb(251,113,50)" rx="2" ry="2" />
+<text  x="1533.74" y="295.5" ></text>
+</g>
+<g >
+<title>_PyObject_GenericGetAttrWithDict (1 samples, 0.07%)</title><rect x="1451.3" y="477" width="1.2" height="15.0" fill="rgb(238,171,36)" rx="2" ry="2" />
+<text  x="1454.34" y="487.5" ></text>
+</g>
+<g >
+<title>$x (4 samples, 0.28%)</title><rect x="1432.3" y="429" width="4.5" height="15.0" fill="rgb(251,113,50)" rx="2" ry="2" />
+<text  x="1435.34" y="439.5" ></text>
+</g>
+<g >
+<title>0xffffe4c6c430 (1 samples, 0.07%)</title><rect x="1112.5" y="349" width="1.2" height="15.0" fill="rgb(230,96,28)" rx="2" ry="2" />
+<text  x="1115.53" y="359.5" ></text>
+</g>
+<g >
+<title>__aarch64_ldadd4_acq_rel (1 samples, 0.07%)</title><rect x="1519.6" y="333" width="1.1" height="15.0" fill="rgb(234,151,32)" rx="2" ry="2" />
+<text  x="1522.55" y="343.5" ></text>
+</g>
+<g >
+<title>0xffffe4f16384 (1 samples, 0.07%)</title><rect x="1158.4" y="381" width="1.1" height="15.0" fill="rgb(248,96,47)" rx="2" ry="2" />
+<text  x="1161.38" y="391.5" ></text>
+</g>
+<g >
+<title>0xffff05ad78c4 (2 samples, 0.14%)</title><rect x="245.9" y="253" width="2.3" height="15.0" fill="rgb(245,96,45)" rx="2" ry="2" />
+<text  x="248.94" y="263.5" ></text>
+</g>
+<g >
+<title>0xffff05bbfb60 (1 samples, 0.07%)</title><rect x="223.6" y="285" width="1.1" height="15.0" fill="rgb(228,96,26)" rx="2" ry="2" />
+<text  x="226.57" y="295.5" ></text>
+</g>
+<g >
+<title>0xfff8e8c0575c (1 samples, 0.07%)</title><rect x="1575.5" y="461" width="1.1" height="15.0" fill="rgb(224,96,21)" rx="2" ry="2" />
+<text  x="1578.46" y="471.5" ></text>
+</g>
+<g >
+<title>c10::cuda::c10_cuda_check_implementation (1 samples, 0.07%)</title><rect x="1433.5" y="397" width="1.1" height="15.0" fill="rgb(247,132,46)" rx="2" ry="2" />
+<text  x="1436.45" y="407.5" ></text>
+</g>
+<g >
+<title>cuCtxGetDevice_v2 (1 samples, 0.07%)</title><rect x="1517.3" y="317" width="1.1" height="15.0" fill="rgb(238,100,36)" rx="2" ry="2" />
+<text  x="1520.32" y="327.5" ></text>
+</g>
+<g >
+<title>0xffff05b1e1e4 (1 samples, 0.07%)</title><rect x="1161.7" y="381" width="1.2" height="15.0" fill="rgb(248,96,47)" rx="2" ry="2" />
+<text  x="1164.73" y="391.5" ></text>
+</g>
+<g >
+<title>0xfffe546b4dd8 (1 samples, 0.07%)</title><rect x="1572.1" y="381" width="1.1" height="15.0" fill="rgb(240,96,39)" rx="2" ry="2" />
+<text  x="1575.11" y="391.5" ></text>
+</g>
+<g >
+<title>all (1,413 samples, 100%)</title><rect x="10.0" y="525" width="1580.0" height="15.0" fill="rgb(255,230,55)" rx="2" ry="2" />
+<text  x="13.00" y="535.5" ></text>
+</g>
+<g >
+<title>0xfffe54608b90 (1 samples, 0.07%)</title><rect x="1572.1" y="285" width="1.1" height="15.0" fill="rgb(237,96,35)" rx="2" ry="2" />
+<text  x="1575.11" y="295.5" ></text>
+</g>
+<g >
+<title>0xfff8e8c005b4 (1 samples, 0.07%)</title><rect x="1454.7" y="461" width="1.1" height="15.0" fill="rgb(237,96,35)" rx="2" ry="2" />
+<text  x="1457.70" y="471.5" ></text>
+</g>
+<g >
+<title>cudaGetDevice (1 samples, 0.07%)</title><rect x="1441.3" y="413" width="1.1" height="15.0" fill="rgb(246,109,46)" rx="2" ry="2" />
+<text  x="1444.28" y="423.5" ></text>
+</g>
+<g >
+<title>NSYS_OSRT_pthread_mutex_lock_1 (1 samples, 0.07%)</title><rect x="1529.6" y="349" width="1.1" height="15.0" fill="rgb(223,119,20)" rx="2" ry="2" />
+<text  x="1532.62" y="359.5" ></text>
+</g>
+<g >
+<title>0x4f247c (1 samples, 0.07%)</title><rect x="1445.8" y="461" width="1.1" height="15.0" fill="rgb(236,102,34)" rx="2" ry="2" />
+<text  x="1448.75" y="471.5" ></text>
+</g>
+<g >
+<title>_Py_NewReference (1 samples, 0.07%)</title><rect x="1424.5" y="461" width="1.1" height="15.0" fill="rgb(251,171,51)" rx="2" ry="2" />
+<text  x="1427.51" y="471.5" ></text>
+</g>
+<g >
+<title>0xffff05bbfad4 (1 samples, 0.07%)</title><rect x="182.2" y="285" width="1.1" height="15.0" fill="rgb(249,96,49)" rx="2" ry="2" />
+<text  x="185.20" y="295.5" ></text>
+</g>
+<g >
+<title>thread: NSys PySampling (13 samples, 0.92%)</title><rect x="10.0" y="509" width="14.5" height="15.0" fill="rgb(243,137,42)" rx="2" ry="2" />
+<text  x="13.00" y="519.5" ></text>
+</g>
+<g >
+<title>0xfffe70a91c08 (2 samples, 0.14%)</title><rect x="80.4" y="429" width="2.3" height="15.0" fill="rgb(238,96,36)" rx="2" ry="2" />
+<text  x="83.45" y="439.5" ></text>
+</g>
+<g >
+<title>at::detail::empty_cuda (3 samples, 0.21%)</title><rect x="1524.0" y="269" width="3.4" height="15.0" fill="rgb(235,111,33)" rx="2" ry="2" />
+<text  x="1527.03" y="279.5" ></text>
+</g>
+</g>
+</svg>

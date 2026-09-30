@@ -1,0 +1,219 @@
+thread: main;_PyEval_EvalFrameDefault 23
+thread: main;0x4f1168 3
+thread: main;PyDict_GetItemWithError 3
+thread: main;PyObject_Free 3
+thread: main;PyObject_GetAttr 3
+thread: main;PyObject_Malloc 3
+thread: main;[Broken backtraces];operator new;__libc_malloc 3
+thread: pt_autograd_0;[Broken backtraces];operator new;__libc_malloc 3
+thread: NSys PySampling;PyCode_Addr2Line 2
+thread: main;0x4f11c4 2
+thread: main;[Broken backtraces];PyObject_RichCompareBool;PyUnicode_RichCompare 2
+thread: main;_Py_NewReference 2
+thread: pt_autograd_0;[Broken backtraces];0xffffc42d1ae0;$x;torch::autograd::Engine::thread_init;torch::autograd::Engine::thread_main;torch::autograd::Engine::evaluate_function;$x 2
+thread: pt_autograd_0;[Broken backtraces];0xffffc42d1ae0;$x;torch::autograd::Engine::thread_init;torch::autograd::Engine::thread_main;torch::autograd::Engine::evaluate_function;$x;$x 2
+thread: pt_autograd_0;_PyEval_EvalFrameDefault 2
+thread: NSys PySampling;[Broken backtraces];0xffffe58bba0c;0xffffe585582c;0xffffe51448d4;0xffffe4bb66a4;0xffffd8054c8c;0xffffd805263c;0x506adc 1
+thread: NSys PySampling;[Broken backtraces];0xffffe58bba0c;0xffffe585582c;0xffffe51448d4;0xffffe4bb66a4;0xffffd8055050;0xffffe49ece9c;0xffffe49ecb60;0xffffe4c6c430 1
+thread: NSys PySampling;[Broken backtraces];PyEval_SaveThread;NSYS_OSRT_pthread_cond_signal_1;pthread_cond_signal;0xffffd75d05251698;0xffffd75d069d2dc4;0xffffd75d069d2658 1
+thread: NSys PySampling;[Broken backtraces];PyObject_Malloc;__libc_malloc;0xffffe59108c4 1
+thread: [NSys];[Broken backtraces];0xffffe58bba0c;0xffffe585582c;0xffffe51448d4;0xffffe4c96a18;0xffffe4c1fa74;0xffffe4c81fdc;0xffffe4c6f824;0xffffe4c6f164;0xffffe4c6eb78;0xffffe4c6dc58;0xffffe4c6d6c8 1
+thread: [NSys];[Broken backtraces];0xffffe58bba0c;0xffffe585582c;0xffffe51448d4;0xffffe4c96a18;0xffffe4c1fa74;0xffffe4c81fdc;0xffffe4c6f824;0xffffe4c6f1b4;0xffffe585a4c4;0xffffe59108c4 1
+thread: main;0x4c6bc0 1
+thread: main;0x4c6d8c 1
+thread: main;0x4cba40 1
+thread: main;0x4dbff4 1
+thread: main;0x4f120c 1
+thread: main;0x4f1844 1
+thread: main;0x4f1938 1
+thread: main;0x4f1e84 1
+thread: main;0x4f1f08 1
+thread: main;0x4f2738 1
+thread: main;0x4f8728 1
+thread: main;0x4f9638 1
+thread: main;0x4f96c0 1
+thread: main;0x514258 1
+thread: main;0x51446c 1
+thread: main;0x514f08 1
+thread: main;0x514ff4 1
+thread: main;0x515794 1
+thread: main;0x522378 1
+thread: main;0x5229fc 1
+thread: main;0x522a6c 1
+thread: main;0x523838 1
+thread: main;0x5289cc 1
+thread: main;0x5291c0 1
+thread: main;0x56f7b0 1
+thread: main;0x5865e4 1
+thread: main;0x59aaa0 1
+thread: main;PyDict_New 1
+thread: main;PyDict_Next 1
+thread: main;PyEval_SaveThread 1
+thread: main;PyFloat_AsDouble 1
+thread: main;PyFloat_FromDouble 1
+thread: main;PyObject_Realloc 1
+thread: main;[Broken backtraces];0x4cc49c;0xfffe78b0d50c;0xfffe78b0cde8;0xfffe78ad1c08;0xfffe78ad2aa8;0xfffe788eca90;0xfffe788fe45c;0xfffe789dd760;0xfffe78b2b778 1
+thread: main;[Broken backtraces];0x4cc49c;0xfffe78b0d50c;0xfffe78b0cde8;0xfffe78ad1c08;0xfffe78ad2aa8;0xfffe788eca90;0xfffe788ff3c0 1
+thread: main;[Broken backtraces];0x4cd4a8;0x4db394 1
+thread: main;[Broken backtraces];0x4f262c;0xffffe5871bdc 1
+thread: main;[Broken backtraces];0x4f5160;_PyTrash_begin 1
+thread: main;[Broken backtraces];0x50332c;PyUFunc_GenericReduction;PyUFunc_ReduceWrapper;NpyIter_Reset 1
+thread: main;[Broken backtraces];0x50332c;pybind11::cpp_function::dispatcher;pybind11::cpp_function::initialize<>::{lambda()#1}::operator();pybind11::detail::argument_loader<>::call_impl<>;__libc_free;0xffffe58641d8 1
+thread: main;[Broken backtraces];0x50332c;pybind11::cpp_function::dispatcher;pybind11::cpp_function::initialize<>::{lambda()#1}::operator();pybind11::detail::argument_loader<>::call_impl<>;transformer_engine::pytorch::fused_attn_fwd;0xffffe585a458 1
+thread: main;[Broken backtraces];0x50332c;pybind11::cpp_function::dispatcher;pybind11::cpp_function::initialize<>::{lambda()#1}::operator();pybind11::detail::argument_loader<>::call_impl<>;transformer_engine::pytorch::fused_attn_fwd;0xffffe585a4c4;0xffffe59108c4 1
+thread: main;[Broken backtraces];0x50332c;pybind11::cpp_function::dispatcher;pybind11::cpp_function::initialize<>::{lambda()#1}::operator();pybind11::detail::argument_loader<>::call_impl<>;transformer_engine::pytorch::fused_attn_fwd;c10::cuda::ExchangeDevice;cudaGetDevice;0xffffc718e87c;0xffffc71e921c;0xffffc71729e8 1
+thread: main;[Broken backtraces];0x50332c;pybind11::cpp_function::dispatcher;pybind11::cpp_function::initialize<>::{lambda()#1}::operator();pybind11::detail::argument_loader<>::call_impl<>;transformer_engine::pytorch::fused_attn_fwd;c10::cuda::impl::CUDAGuardImpl::uncheckedSetDevice;c10::cuda::SetDevice;cudaGetDevice;0xffffc7176148;cuCtxGetDevice_v2;0xffff05a63c7c;0xfffe546a4dd8;0xfffe546a4be4;0xfffe546aa434;0xfffe546aa268;0xfffe546b30fc 1
+thread: main;[Broken backtraces];0x50332c;pybind11::cpp_function::dispatcher;pybind11::cpp_function::initialize<>::{lambda()#1}::operator();pybind11::detail::argument_loader<>::call_impl<>;transformer_engine::pytorch::fused_attn_fwd;nvte_fused_attn_fwd_v2 1
+thread: main;[Broken backtraces];0x50332c;pybind11::cpp_function::dispatcher;pybind11::cpp_function::initialize<>::{lambda()#1}::operator();pybind11::detail::argument_loader<>::call_impl<>;transformer_engine::pytorch::fused_attn_fwd;nvte_fused_attn_fwd_v2;0xffffe49e4fa4;0xffffe49e4e0c;0xffffe4c6c430 1
+thread: main;[Broken backtraces];0x50332c;pybind11::cpp_function::dispatcher;pybind11::cpp_function::initialize<>::{lambda()#1}::operator();pybind11::detail::argument_loader<>::call_impl<>;transformer_engine::pytorch::fused_attn_fwd;nvte_fused_attn_fwd_v2;nvte_get_fused_attn_backend_v2;0xffffe49e3c24;0xffffe49e3a58;0xffffe49eee9c 1
+thread: main;[Broken backtraces];0x50332c;pybind11::cpp_function::dispatcher;pybind11::cpp_function::initialize<>::{lambda()#1}::operator();pybind11::detail::argument_loader<>::call_impl<>;transformer_engine::pytorch::fused_attn_fwd;nvte_fused_attn_fwd_v2;nvte_get_fused_attn_backend_v2;transformer_engine::support_verdict_f16[];transformer_engine::fused_attn::get_graph<>;std::__tuple_compare<>::__less 1
+thread: main;[Broken backtraces];0x50332c;pybind11::cpp_function::dispatcher;pybind11::cpp_function::initialize<>::{lambda()#1}::operator();pybind11::detail::argument_loader<>::call_impl<>;transformer_engine::pytorch::fused_attn_fwd;nvte_fused_attn_fwd_v2;transformer_engine::detail::HandleManager<>::GetHandle;transformer_engine::cuda::current_device;cuCtxGetCurrent;0xffff05a64294;0xfffe546a4dd8;0xfffe546a4be4;0xfffe546aa434;0xfffe546aa268;0xfffe546b30d4 1
+thread: main;[Broken backtraces];0x50332c;pybind11::cpp_function::dispatcher;pybind11::cpp_function::initialize<>::{lambda()#1}::operator();pybind11::detail::argument_loader<>::call_impl<>;transformer_engine::pytorch::fused_attn_fwd;nvte_fused_attn_fwd_v2;transformer_engine::detail::HandleManager<>::GetHandle;transformer_engine::cuda::current_device;std::_Hashtable<>::find 1
+thread: main;[Broken backtraces];0x50332c;pybind11::cpp_function::dispatcher;pybind11::cpp_function::initialize<>::{lambda()#1}::operator();pybind11::detail::argument_loader<>::call_impl<>;transformer_engine::pytorch::fused_attn_fwd;nvte_fused_attn_fwd_v2;transformer_engine::fused_attn::FusedAttnFwdParams::make_config;nvte_get_kv_format 1
+thread: main;[Broken backtraces];0x50332c;pybind11::cpp_function::dispatcher;pybind11::cpp_function::initialize<>::{lambda()#1}::operator();pybind11::detail::argument_loader<>::call_impl<>;transformer_engine::pytorch::fused_attn_fwd;nvte_fused_attn_fwd_v2;transformer_engine::fused_attn_arbitrary_seqlen_fwd;transformer_engine::fused_attn::fused_attn_arbitrary_seqlen_fwd_impl 1
+thread: main;[Broken backtraces];0x50332c;pybind11::cpp_function::dispatcher;pybind11::cpp_function::initialize<>::{lambda()#1}::operator();pybind11::detail::argument_loader<>::call_impl<>;transformer_engine::pytorch::fused_attn_fwd;nvte_fused_attn_fwd_v2;transformer_engine::fused_attn_arbitrary_seqlen_fwd;transformer_engine::fused_attn::fused_attn_arbitrary_seqlen_fwd_impl;__aarch64_ldadd4_acq_rel 1
+thread: main;[Broken backtraces];0x50332c;pybind11::cpp_function::dispatcher;pybind11::cpp_function::initialize<>::{lambda()#1}::operator();pybind11::detail::argument_loader<>::call_impl<>;transformer_engine::pytorch::fused_attn_fwd;nvte_fused_attn_fwd_v2;transformer_engine::fused_attn_arbitrary_seqlen_fwd;transformer_engine::fused_attn::fused_attn_arbitrary_seqlen_fwd_impl;cudnn_frontend::graph::Graph::get_workspace_size_plan_at_index 1
+thread: main;[Broken backtraces];0x50332c;pybind11::cpp_function::dispatcher;pybind11::cpp_function::initialize<>::{lambda()#1}::operator();pybind11::detail::argument_loader<>::call_impl<>;transformer_engine::pytorch::fused_attn_fwd;nvte_fused_attn_fwd_v2;transformer_engine::fused_attn_arbitrary_seqlen_fwd;transformer_engine::fused_attn::fused_attn_arbitrary_seqlen_fwd_impl;std::_Hashtable<>::_Hashtable<>;std::_Hashtable<>::_M_insert_unique_node;_init 1
+thread: main;[Broken backtraces];0x50332c;pybind11::cpp_function::dispatcher;pybind11::cpp_function::initialize<>::{lambda()#1}::operator();pybind11::detail::argument_loader<>::call_impl<>;transformer_engine::pytorch::fused_attn_fwd;transformer_engine::pytorch::allocateSpace;at::empty;at::_ops::empty_memory_format::call;$x;at::_ops::empty_memory_format::redispatch;$x;$x;at::native::empty_cuda;at::detail::empty_cuda;at::detail::empty_cuda;$x;$x;c10::cuda::GetDevice;cudaGetDevice;0xffff05c150b0;0xfffe546a4dd8;0xfffe546a4be4;0xfffe546aa434;0xfffe546aa268;0xfffe546b2d6c 1
+thread: main;[Broken backtraces];0x50332c;pybind11::cpp_function::dispatcher;pybind11::cpp_function::initialize<>::{lambda()#1}::operator();pybind11::detail::argument_loader<>::call_impl<>;transformer_engine::pytorch::fused_attn_fwd;transformer_engine::pytorch::allocateSpace;at::empty;at::_ops::empty_memory_format::call;$x;at::_ops::empty_memory_format::redispatch;$x;$x;at::native::empty_cuda;at::detail::empty_cuda;at::detail::empty_cuda;$x;c10::cuda::SetDevice;cudaGetDevice;0xffffc71761ec;0xffffc71a8924 1
+thread: main;[Broken backtraces];0x50332c;pybind11::cpp_function::dispatcher;pybind11::cpp_function::initialize<>::{lambda()#1}::operator();pybind11::detail::argument_loader<>::call_impl<>;transformer_engine::pytorch::fused_attn_fwd;transformer_engine::pytorch::allocateSpace;at::empty;at::_ops::empty_memory_format::call;$x;at::_ops::empty_memory_format::redispatch;$x;$x;at::native::empty_cuda;at::detail::empty_cuda;at::detail::empty_cuda;at::detail::empty_generic;$x;$x;$x 1
+thread: main;[Broken backtraces];0x50332c;pybind11::cpp_function::dispatcher;pybind11::cpp_function::initialize<>::{lambda()#1}::operator();pybind11::detail::argument_loader<>::call_impl<>;transformer_engine::pytorch::fused_attn_fwd;transformer_engine::pytorch::makeTransformerEngineTensor;transformer_engine::pytorch::detail::IsFloat8Tensor 1
+thread: main;[Broken backtraces];0x50332c;pybind11::cpp_function::dispatcher;pybind11::cpp_function::initialize<>::{lambda()#1}::operator();pybind11::detail::argument_loader<>::call_impl<>;transformer_engine::pytorch::fused_attn_fwd;transformer_engine::pytorch::quantizer_helper;transformer_engine::pytorch::NoneQuantizer::create_tensor;at::empty 1
+thread: main;[Broken backtraces];0x50332c;pybind11::cpp_function::dispatcher;pybind11::cpp_function::initialize<>::{lambda()#1}::operator();pybind11::detail::argument_loader<>::call_impl<>;transformer_engine::pytorch::fused_attn_fwd;transformer_engine::pytorch::quantizer_helper;transformer_engine::pytorch::NoneQuantizer::create_tensor;at::empty;at::_ops::empty_memory_format::call 1
+thread: main;[Broken backtraces];0x50332c;pybind11::cpp_function::dispatcher;pybind11::cpp_function::initialize<>::{lambda()#1}::operator();pybind11::detail::argument_loader<>::call_impl<>;transformer_engine::pytorch::fused_attn_fwd;transformer_engine::pytorch::quantizer_helper;transformer_engine::pytorch::NoneQuantizer::create_tensor;at::empty;at::_ops::empty_memory_format::call;$x;at::_ops::empty_memory_format::redispatch;$x;$x;at::native::empty_cuda;at::detail::empty_cuda 1
+thread: main;[Broken backtraces];0x50332c;pybind11::cpp_function::dispatcher;pybind11::detail::is_function_record_PyObject;pybind11::detail::get_local_internals 1
+thread: main;[Broken backtraces];0x503534;$x;$x;$x 1
+thread: main;[Broken backtraces];0x503534;$x;$x;torch::PythonArgParser::raw_parse;$x 1
+thread: main;[Broken backtraces];0x503534;$x;$x;torch::autograd::Engine::execute;$x;$x;$x;__libc_free;0xffffe5864308 1
+thread: main;[Broken backtraces];0x503534;$x;$x;torch::autograd::Engine::execute;$x;torch::autograd::Engine::execute_with_graph_task;$x;$x;$x 1
+thread: main;[Broken backtraces];0x503534;$x;$x;torch::autograd::Engine::execute;$x;torch::autograd::Engine::execute_with_graph_task;NSYS_OSRT_pthread_cond_signal_1;pthread_cond_signal;0xffffe5910940 1
+thread: main;[Broken backtraces];0x503534;$x;$x;torch::autograd::Engine::execute;torch::autograd::Engine::compute_dependencies;$x;$x;cuDevicePrimaryCtxGetState;0xffff05a655bc;0xffff05a018b4;0xffff05adf4e0 1
+thread: main;[Broken backtraces];0x503534;$x;$x;torch::autograd::Engine::execute;torch::autograd::Engine::compute_dependencies;$x;$x;cuDevicePrimaryCtxGetState;0xffff05a65630;0xfffe546a4dd8;0xfffe546a4be4;0xfffe546aa434;0xfffe546aa1ec;0xfffe545cf078;0xfffe546178e8;0xfffe545bc360 1
+thread: main;[Broken backtraces];0x503534;$x;$x;torch::autograd::Engine::execute;torch::autograd::Engine::compute_dependencies;$x;$x;cuDevicePrimaryCtxGetState;0xffff05a6567c;0xffff05a74658 1
+thread: main;[Broken backtraces];0x503534;$x;$x;torch::autograd::Engine::execute;torch::autograd::Engine::init_local_ready_queue;$x 1
+thread: main;[Broken backtraces];0x503534;$x;$x;torch::autograd::Engine::execute;torch::autograd::InputMetadata::InputMetadata 1
+thread: main;[Broken backtraces];0x503534;$x;at::_ops::view::call;$x;$x;$x;$x;torch::autograd::impl::gradient_edge;at::TensorBase::grad_fn 1
+thread: main;[Broken backtraces];0x503534;$x;at::_ops::view::call;$x;$x;$x;torch::autograd::InputMetadata::InputMetadata;torch::autograd::InputMetadata::InputMetadata;$x;c10::cuda::getCurrentCUDAStream;$x 1
+thread: main;[Broken backtraces];0x503534;(anonymous namespace)::THPFunction_apply;$x;torch::autograd::SavedVariable::SavedVariable 1
+thread: main;[Broken backtraces];0x503534;(anonymous namespace)::THPFunction_apply;$x;torch::autograd::_wrap_outputs;$x 1
+thread: main;[Broken backtraces];0x503534;(anonymous namespace)::THPFunction_apply;$x;torch::autograd::_wrap_outputs;torch::autograd::AutogradMeta::fw_grad 1
+thread: main;[Broken backtraces];0x503534;(anonymous namespace)::THPFunction_apply;at::functorch::functorchTLSAccessor;0xfffff7fc28e4 1
+thread: main;[Broken backtraces];0x51db14;$x;at::RecordFunction::currentThreadId 1
+thread: main;[Broken backtraces];0x523834;$x;$x;c10::TensorImpl::~TensorImpl;$x;$x;c10::cuda::CUDACachingAllocator::Native::DeviceCachingAllocator::free_locked;$x;$x;__libc_free;0xffffe5864308;0xffffe5910674 1
+thread: main;[Broken backtraces];0x5291bc;_PyObject_GenericGetAttrWithDict 1
+thread: main;[Broken backtraces];0x5867f4;0x4d51a0 1
+thread: main;[Broken backtraces];0x5a4020;0xffffd806a40c;strcmp 1
+thread: main;[Broken backtraces];0x5a4020;0xffffe4bb4474;0xffffe50fcdfc;0xffffe5664210 1
+thread: main;[Broken backtraces];0x5a4020;0xffffe4bc28f0;0xffffe49e2d08;0xffffe49e2ac0;0xffffe49dfd78;0xffffe4f16a54;0xffffe4f16384 1
+thread: main;[Broken backtraces];0x5a4020;0xffffe4bc28f0;0xffffe49e2d08;0xffffe49e2b2c;0xffffe4c6c430 1
+thread: main;[Broken backtraces];0x5a4020;0xffffe4bc29a0;0xffffe49e9fc0;0xffffe4c6c430 1
+thread: main;[Broken backtraces];0x5eef1c;PyWeakref_NewRef 1
+thread: main;[Broken backtraces];0xffff05408e6c;cuLaunchKernelEx;0xffff05a15634;0xfffe546a4dd8;0xfffe546a4be4;0xfffe546aa434;0xfffe546aa268;0xfffe546b310c;0xfffe5461cd20;0xfffe546163c0;0xfffe5461bfbc 1
+thread: main;[Broken backtraces];0xffff05408e6c;cuLaunchKernelEx;0xffff05a15678;0xffff05a90460;0xffff05a90be0;0xffff05a91150;0xffff05b1d5c4;0xffff05b207f4;0xffff05b9a82c;0xfffe546a4dd8;0xfffe546a4be4;0xfffe546aa434;0xfffe546aa268;0xfffe546bae00;0xfffe54609704 1
+thread: main;[Broken backtraces];0xffff05408e6c;cuLaunchKernelEx;0xffff05a15678;0xffff05a90460;0xffff05a90be0;0xffff05a91150;0xffff05b1d9fc;0xfffe546a4dd8;0xfffe546a4be4;0xfffe546aa434;0xfffe546aa268;0xfffe546af844;0xfffe54622354;0xfffe546221d0;0xfffe546035b4 1
+thread: main;[Broken backtraces];0xffff05408e6c;cuLaunchKernelEx;0xffff05a15678;0xffff05a90460;0xffff05a90be0;0xffff05a91150;0xffff05b1d9fc;0xfffe546a4dd8;0xfffe546a4be4;0xfffe546aa434;0xfffe546aa268;0xfffe546af844;0xfffe54622354;0xfffe546221d0;0xfffe54603994 1
+thread: main;[Broken backtraces];0xffff05408e6c;cuLaunchKernelEx;0xffff05a15678;0xffff05a90460;0xffff05a90be0;0xffff05a91150;0xffff05b1e854;0xffff05b9839c 1
+thread: main;[Broken backtraces];0xffff05408e6c;cuLaunchKernelEx;0xffff05a15678;0xffff05a90460;0xffff05a90be0;0xffff05a91150;0xffff05b1f108;0xffff05b4fac0 1
+thread: main;[Broken backtraces];PyFunction_New;PyTuple_Size 1
+thread: main;[Broken backtraces];PyObject_Malloc;__libc_malloc;0xffffe5865148;0xffffe58629c4;0xffffe5910864 1
+thread: main;[Broken backtraces];PyObject_Malloc;__libc_malloc;0xffffe5865148;0xffffe5862a80 1
+thread: main;[Broken backtraces];PyObject_RichCompare;0x524afc 1
+thread: main;[Broken backtraces];PyObject_RichCompare;0x524c14 1
+thread: main;[Broken backtraces];_PyEval_EvalFrameDefault;$x 1
+thread: main;[Broken backtraces];_PyEval_EvalFrameDefault;$x;$x 1
+thread: main;[Broken backtraces];_PyEval_EvalFrameDefault;$x;$x;$x;c10::cuda::ExchangeDevice;cudaGetDevice;0xffff05c150b0;0xfffe546a4dd8;0xfffe546a4bcc 1
+thread: main;[Broken backtraces];_PyEval_EvalFrameDefault;$x;$x;$x;c10::cuda::ExchangeDevice;cudaGetDevice;0xffff05c150b0;0xfffe546a4dd8;0xfffe546a4be4;0xfffe546aa434 1
+thread: main;[Broken backtraces];_PyEval_EvalFrameDefault;$x;$x;$x;c10::cuda::ExchangeDevice;cudaGetDevice;0xffff05c150b0;0xfffe546a4dd8;0xfffe546a4be4;0xfffe546aa434;0xfffe546aa268;0xfffe546b2e24 1
+thread: main;[Broken backtraces];_PyEval_EvalFrameDefault;$x;$x;at::indexing::impl::applySlice;at::_ops::slice_Tensor::call;$x;$x;$x 1
+thread: main;[Broken backtraces];_PyEval_EvalFrameDefault;$x;$x;c10::cuda::SetDevice;cudaGetDevice;0xffffc7176148;cuCtxGetDevice_v2;0xffff05a63c44;0xfffe546a4dd8;0xfffe546a4bec;0xfffe546a49b4 1
+thread: main;[Broken backtraces];_PyEval_EvalFrameDefault;$x;THPVariable_Wrap 1
+thread: main;[Broken backtraces];_PyEval_EvalFrameDefault;$x;pybind11::cpp_function::initialize<>::{lambda()#1}::_FUN 1
+thread: main;[Broken backtraces];_PyEval_EvalFrameDefault;0x5412dc 1
+thread: main;[Broken backtraces];_PyObject_GenericGetAttrWithDict;$x;torch::PyWarningHandler::~PyWarningHandler;c10::WarningUtils::set_warning_handler 1
+thread: main;[Broken backtraces];cudnn::cnn::EngineInterface::execute;0xfff868c00308;0xfff868c008c4;0xfffefe1a1c64;0xfffefe19f204;0xfffefe0bf120 1
+thread: main;[Broken backtraces];cudnn::cnn::EngineInterface::execute;0xfff868c00308;0xfff868c008c4;0xfffefe1a1c64;0xfffefe19f204;0xffffc428d08c 1
+thread: main;[Broken backtraces];cudnn::cnn::EngineInterface::execute;0xfff868c00764 1
+thread: main;[Broken backtraces];cudnn::cnn::EngineInterface::execute;0xfff868c01204;0xfff868c01418;cuDeviceGet;0xffff05a68734;0xfffe546a4dd8;0xfffe546a4be4;0xfffe546aa434;0xfffe546aa268;0xfffe546b3104 1
+thread: main;[Broken backtraces];cudnn::cnn::EngineInterface::execute;0xfff868c01204;0xfff868c0149c;cuKernelSetAttribute;0xffff05a5ca30;0xffff05aa8934;0xffff05a05f04 1
+thread: main;[Broken backtraces];cudnn::cnn::EngineInterface::execute;0xfff868c01204;0xfff868c014f4;0xfff866aaf5e8 1
+thread: main;[Broken backtraces];operator new;__libc_malloc;0xffffe5865508 1
+thread: main;[Broken backtraces];operator new;__libc_malloc;0xffffe59108c4 1
+thread: main;[Broken backtraces];pybind11::cpp_function::dispatcher;pybind11::cpp_function::initialize<>::{lambda()#1}::operator();pybind11::detail::argument_loader<>::call_impl<>;transformer_engine::pytorch::fused_attn_fwd;nvte_fused_attn_fwd_v2;transformer_engine::fused_attn_arbitrary_seqlen_fwd;transformer_engine::fused_attn::fused_attn_arbitrary_seqlen_fwd_impl;cudnn_frontend::graph::Graph::execute_plan_at_index;cudnn_frontend::graph::Graph::execute_plan_at_index;cudnn_frontend::detail::execute;cudnn_frontend::detail::create_variant_pack;cudnnBackendFinalize 1
+thread: main;[Broken backtraces];std::condition_variable::wait;NSYS_OSRT_pthread_cond_wait_1;0xffffe4aa9698;0xffffe566b1e0;0xffffe566af1c;0xffffe5669b2c;0xffffe566d6c0 1
+thread: main;_PyDict_GetItem_KnownHash 1
+thread: main;_PyFunction_Vectorcall 1
+thread: main;_PyType_GetDict 1
+thread: main;_PyType_Lookup 1
+thread: pt_autograd_0;0x4f1168 1
+thread: pt_autograd_0;0x514524 1
+thread: pt_autograd_0;0x561f20 1
+thread: pt_autograd_0;PyMem_Free 1
+thread: pt_autograd_0;PyObject_Free 1
+thread: pt_autograd_0;PyObject_Malloc 1
+thread: pt_autograd_0;[Broken backtraces];0x50332c;pybind11::cpp_function::dispatcher;pybind11::cpp_function::initialize<>::{lambda()#1}::operator();pybind11::detail::argument_loader<>::call_impl<>;transformer_engine::pytorch::fused_attn_bwd;nvte_fused_attn_bwd_v2;0xffffc428d088 1
+thread: pt_autograd_0;[Broken backtraces];0x50332c;pybind11::cpp_function::dispatcher;pybind11::cpp_function::initialize<>::{lambda()#1}::operator();pybind11::detail::argument_loader<>::call_impl<>;transformer_engine::pytorch::fused_attn_bwd;nvte_fused_attn_bwd_v2;0xffffe49e4fa4;0xffffe49e4db4;0xffffe4531a78 1
+thread: pt_autograd_0;[Broken backtraces];0x50332c;pybind11::cpp_function::dispatcher;pybind11::cpp_function::initialize<>::{lambda()#1}::operator();pybind11::detail::argument_loader<>::call_impl<>;transformer_engine::pytorch::fused_attn_bwd;nvte_fused_attn_bwd_v2;nvte_get_fused_attn_backend_v2 1
+thread: pt_autograd_0;[Broken backtraces];0x50332c;pybind11::cpp_function::dispatcher;pybind11::cpp_function::initialize<>::{lambda()#1}::operator();pybind11::detail::argument_loader<>::call_impl<>;transformer_engine::pytorch::fused_attn_bwd;nvte_fused_attn_bwd_v2;nvte_get_fused_attn_backend_v2;transformer_engine::detail::HandleManager<>::GetHandle;transformer_engine::cuda::current_device;cudaGetDevice;0xffffc71a6760 1
+thread: pt_autograd_0;[Broken backtraces];0x50332c;pybind11::cpp_function::dispatcher;pybind11::cpp_function::initialize<>::{lambda()#1}::operator();pybind11::detail::argument_loader<>::call_impl<>;transformer_engine::pytorch::fused_attn_bwd;nvte_fused_attn_bwd_v2;transformer_engine::detail::HandleManager<>::GetHandle 1
+thread: pt_autograd_0;[Broken backtraces];0x50332c;pybind11::cpp_function::dispatcher;pybind11::cpp_function::initialize<>::{lambda()#1}::operator();pybind11::detail::argument_loader<>::call_impl<>;transformer_engine::pytorch::fused_attn_bwd;nvte_fused_attn_bwd_v2;transformer_engine::fused_attn::FusedAttnConfig::derive;0xfffefe0ddf10 1
+thread: pt_autograd_0;[Broken backtraces];0x50332c;pybind11::cpp_function::dispatcher;pybind11::cpp_function::initialize<>::{lambda()#1}::operator();pybind11::detail::argument_loader<>::call_impl<>;transformer_engine::pytorch::fused_attn_bwd;nvte_fused_attn_bwd_v2;transformer_engine::fused_attn_arbitrary_seqlen_bwd;transformer_engine::fused_attn::fused_attn_arbitrary_seqlen_bwd_impl 1
+thread: pt_autograd_0;[Broken backtraces];0x50332c;pybind11::cpp_function::dispatcher;pybind11::cpp_function::initialize<>::{lambda()#1}::operator();pybind11::detail::argument_loader<>::call_impl<>;transformer_engine::pytorch::fused_attn_bwd;nvte_fused_attn_bwd_v2;transformer_engine::fused_attn_arbitrary_seqlen_bwd;transformer_engine::fused_attn::fused_attn_arbitrary_seqlen_bwd_impl;cudnn_frontend::graph::Graph::execute_plan_at_index 1
+thread: pt_autograd_0;[Broken backtraces];0x50332c;pybind11::cpp_function::dispatcher;pybind11::cpp_function::initialize<>::{lambda()#1}::operator();pybind11::detail::argument_loader<>::call_impl<>;transformer_engine::pytorch::fused_attn_bwd;nvte_fused_attn_bwd_v2;transformer_engine::fused_attn_arbitrary_seqlen_bwd;transformer_engine::fused_attn::fused_attn_arbitrary_seqlen_bwd_impl;std::_Hashtable<>::_Hashtable<>;std::_Hashtable<>::_M_insert_unique_node;std::__detail::_Prime_rehash_policy::_M_need_rehash 1
+thread: pt_autograd_0;[Broken backtraces];0x50332c;pybind11::cpp_function::dispatcher;pybind11::cpp_function::initialize<>::{lambda()#1}::operator();pybind11::detail::argument_loader<>::call_impl<>;transformer_engine::pytorch::fused_attn_bwd;nvte_fused_attn_bwd_v2;transformer_engine::fused_attn_arbitrary_seqlen_bwd;transformer_engine::fused_attn::fused_attn_arbitrary_seqlen_bwd_impl;std::_Hashtable<>::_M_insert_unique_node;std::_Hashtable<>::_M_rehash 1
+thread: pt_autograd_0;[Broken backtraces];0x50332c;pybind11::cpp_function::dispatcher;pybind11::cpp_function::initialize<>::{lambda()#1}::operator();pybind11::detail::argument_loader<>::call_impl<>;transformer_engine::pytorch::fused_attn_bwd;nvte_fused_attn_bwd_v2;transformer_engine::fused_attn_arbitrary_seqlen_bwd;transformer_engine::fused_attn::fused_attn_arbitrary_seqlen_bwd_impl;transformer_engine::fused_attn::get_graph<>;transformer_engine::fused_attn::FusedAttnConfig::make_cache_key;transformer_engine::cuda::current_device;cudaGetDevice;0xffffc71a6760 1
+thread: pt_autograd_0;[Broken backtraces];0x50332c;pybind11::cpp_function::dispatcher;pybind11::cpp_function::initialize<>::{lambda()#1}::operator();pybind11::detail::argument_loader<>::call_impl<>;transformer_engine::pytorch::fused_attn_bwd;nvte_set_fused_attn_bwd_params_attribute 1
+thread: pt_autograd_0;[Broken backtraces];0x50332c;pybind11::cpp_function::dispatcher;pybind11::cpp_function::initialize<>::{lambda()#1}::operator();pybind11::detail::argument_loader<>::call_impl<>;transformer_engine::pytorch::fused_attn_bwd;torch::empty;at::empty;at::_ops::empty_memory_format::call;$x;at::_ops::empty_memory_format::redispatch;$x;$x;at::native::empty_cuda;at::detail::empty_cuda;at::detail::empty_cuda;$x;$x;c10::cuda::GetDevice;cudaGetDevice;0xffff05c150b0;0xfffe546a4dd8;0xfffe546a4be4;0xfffe546aa434;0xfffe546aa3f0 1
+thread: pt_autograd_0;[Broken backtraces];0x50332c;pybind11::cpp_function::dispatcher;pybind11::cpp_function::initialize<>::{lambda()#1}::operator();pybind11::detail::argument_loader<>::call_impl<>;transformer_engine::pytorch::fused_attn_bwd;transformer_engine::pytorch::quantizer_helper;transformer_engine::pytorch::NoneQuantizer::create_tensor;at::empty;at::_ops::empty_memory_format::call;$x;at::_ops::empty_memory_format::redispatch;$x 1
+thread: pt_autograd_0;[Broken backtraces];0x50332c;pybind11::cpp_function::dispatcher;pybind11::cpp_function::initialize<>::{lambda()#1}::operator();pybind11::detail::argument_loader<>::call_impl<>;transformer_engine::pytorch::fused_attn_bwd;transformer_engine::pytorch::quantizer_helper;transformer_engine::pytorch::NoneQuantizer::create_tensor;at::empty;at::_ops::empty_memory_format::call;$x;at::_ops::empty_memory_format::redispatch;$x;$x;$x;c10::cuda::SetDevice;cudaGetDevice;0xffffc7176148;cuCtxGetDevice_v2;0xffff05a63c7c;0xffff05bf87d8 1
+thread: pt_autograd_0;[Broken backtraces];0x50332c;pybind11::cpp_function::dispatcher;pybind11::cpp_function::initialize<>::{lambda()#1}::operator();pybind11::detail::argument_loader<>::call_impl<>;transformer_engine::pytorch::fused_attn_bwd;transformer_engine::pytorch::quantizer_helper;transformer_engine::pytorch::NoneQuantizer::create_tensor;at::empty;at::_ops::empty_memory_format::call;$x;at::_ops::empty_memory_format::redispatch;$x;$x;at::native::empty_cuda;at::detail::empty_cuda;at::detail::empty_cuda;$x;$x;c10::cuda::ExchangeDevice;cudaGetDevice;0xffffc7176148;cuCtxGetDevice_v2;0xffff05a63bd4;0xffff05a018b4;0xffff05adf4e0 1
+thread: pt_autograd_0;[Broken backtraces];0x50332c;pybind11::cpp_function::dispatcher;pybind11::cpp_function::initialize<>::{lambda()#1}::operator();pybind11::detail::argument_loader<>::call_impl<>;transformer_engine::pytorch::fused_attn_bwd;transformer_engine::pytorch::quantizer_helper;transformer_engine::pytorch::NoneQuantizer::create_tensor;at::empty;at::_ops::empty_memory_format::call;$x;at::_ops::empty_memory_format::redispatch;$x;$x;at::native::empty_cuda;at::detail::empty_cuda;at::detail::empty_cuda;$x;c10::cuda::SetDevice;cudaGetDevice;0xffff05c150b0;0xfffe546a4dd8;0xfffe546a4be4;0xfffe546aa434;0xfffe546aa268;0xfffe546b2d9c;0xfffe5461de1c;0xfffe545f8b98 1
+thread: pt_autograd_0;[Broken backtraces];0x50332c;pybind11::cpp_function::dispatcher;pybind11::cpp_function::initialize<>::{lambda()#1}::operator();pybind11::detail::argument_loader<>::call_impl<>;transformer_engine::pytorch::fused_attn_bwd;transformer_engine::pytorch::quantizer_helper;transformer_engine::pytorch::NoneQuantizer::create_tensor;at::empty;at::_ops::empty_memory_format::call;$x;at::_ops::empty_memory_format::redispatch;$x;$x;at::native::empty_cuda;at::detail::empty_cuda;at::detail::empty_cuda;$x;c10::cuda::SetDevice;cudaGetDevice;0xffffc7176148;cuCtxGetDevice_v2;0xffff05a63c44;0xfffe546a4dd8;0xfffe546a4bec;0xfffe546a49f4 1
+thread: pt_autograd_0;[Broken backtraces];0x50332c;pybind11::cpp_function::dispatcher;pybind11::cpp_function::initialize<>::{lambda()#1}::operator();pybind11::detail::argument_loader<>::call_impl<>;transformer_engine::pytorch::fused_attn_bwd;transformer_engine::pytorch::quantizer_helper;transformer_engine::pytorch::NoneQuantizer::create_tensor;transformer_engine::pytorch::NoneQuantizer::create_tensor;pybind11::detail::type_caster<>::cast;THPVariable_Wrap;$x 1
+thread: pt_autograd_0;[Broken backtraces];0x5a4020;0xffffe4bc28f0;0xffffe49e2d08;0xffffe49e2af8;0xffffe49eee0c;0xffffe4c8a6e4 1
+thread: pt_autograd_0;[Broken backtraces];0xffff05400b60;0xffff05400b70 1
+thread: pt_autograd_0;[Broken backtraces];0xffff054061e8;cuLaunchKernelEx;0xffff05a15678;0xffff05a90460;0xffff05a909c8;0xffff05a913e8;0xffff05a0115c 1
+thread: pt_autograd_0;[Broken backtraces];0xffff054061e8;cuLaunchKernelEx;0xffff05a15678;0xffff05a90460;0xffff05a90be0;0xffff05a91150;0xffff05b1d54c 1
+thread: pt_autograd_0;[Broken backtraces];0xffff054061e8;cuLaunchKernelEx;0xffff05a15678;0xffff05a90460;0xffff05a90be0;0xffff05a91150;0xffff05b1d9fc;0xfffe546a4dd8;0xfffe546a4be4;0xfffe546aa434;0xfffe546aa268;0xfffe546af844;0xfffe54622354;0xfffe546221d0;0xfffe546035a8 1
+thread: pt_autograd_0;[Broken backtraces];0xffff054061e8;cuLaunchKernelEx;0xffff05a15678;0xffff05a90460;0xffff05a90be0;0xffff05a91150;0xffff05b1d9fc;0xfffe546a4dd8;0xfffe546a4be4;0xfffe546aa434;0xfffe546aa268;0xfffe546af844;0xfffe54622354;0xfffe546221d0;0xfffe54603b00;0xfffe545fa848 1
+thread: pt_autograd_0;[Broken backtraces];0xffff054061e8;cuLaunchKernelEx;0xffff05a15678;0xffff05a90460;0xffff05a90be0;0xffff05a91150;0xffff05b1e600;0xffff05bd04c8 1
+thread: pt_autograd_0;[Broken backtraces];0xffff05408e6c;cuLaunchKernelEx;0xffff05a15678;0xffff05a90460;0xffff05a90be0;0xffff05a91150;0xffff05b1e4b0;0xffff05b98fcc;0xffff05aee53c;0xffffe5871c68 1
+thread: pt_autograd_0;[Broken backtraces];0xffff05408e6c;cuLaunchKernelEx;0xffff05a15678;0xffff05a90460;0xffff05a90be0;0xffff05a91150;0xffff05b1e600;0xffff05bd050c;0xffffe585a4c4;0xffffe59108c4 1
+thread: pt_autograd_0;[Broken backtraces];0xffff0540d0b0;cuMemsetD8Async;0xffff05a18d2c;0xffff05aa7014;0xffff05b3cfb0;0xffff05b3dbec;0xffff05b769f0 1
+thread: pt_autograd_0;[Broken backtraces];0xffff0540d0b0;cuMemsetD8Async;0xffff05a18d2c;0xffff05aa7014;0xffff05b3cff0;0xffff05b3d5f8;0xffff05b3d260;0xffff05c1f34c;0xffff05c1b8a4;0xffff05b1d380;0xfffe546a4dd8;0xfffe546a4be4;0xfffe546aa434;0xfffe546aa268;0xfffe546b5048;0xfffe546b4c1c;0xfffe54621a68 1
+thread: pt_autograd_0;[Broken backtraces];0xffff0540d0b0;cuMemsetD8Async;0xffff05a18d2c;0xffff05aa7014;0xffff05b3cff0;0xffff05b3d5f8;0xffff05b3d260;0xffff05c1f34c;0xffff05c1b8a4;0xffff05b1d5c4;0xffff05b20750;0xffff05ae3c9c;0xffff05b8f7c0 1
+thread: pt_autograd_0;[Broken backtraces];0xffff0540d0b0;cuMemsetD8Async;0xffff05a18d2c;0xffff05aa7014;0xffff05b3cff0;0xffff05b3d5f8;0xffff05b3d260;0xffff05c1f34c;0xffff05c1b8a4;0xffff05b1e600;0xffff05bd050c;0xffffe585a4c4;0xffffe59108c4 1
+thread: pt_autograd_0;[Broken backtraces];0xffff0540d0b0;cuMemsetD8Async;0xffff05a18d2c;0xffff05aa7014;0xffff05b3cff0;0xffff05b3d5f8;0xffff05b3d260;0xffff05c1f3ec;0xffff05b3e534;0xfffe546a4dd8;0xfffe546a4be4;0xfffe546aa434;0xfffe546aa268;0xfffe546aefc0;0xfffe54624474 1
+thread: pt_autograd_0;[Broken backtraces];0xffff05413da8;0xffff05c150b0;0xfffe546a4dd8;0xfffe546a4be4;0xfffe546aa434;0xfffe546aa268;0xfffe546b2e38;0xfffe5461e09c 1
+thread: pt_autograd_0;[Broken backtraces];0xffffc42d1ae0;$x;torch::autograd::Engine::thread_init;torch::autograd::Engine::thread_main;$x;$x;NSYS_OSRT_pthread_cond_broadcast_1;pthread_cond_broadcast 1
+thread: pt_autograd_0;[Broken backtraces];0xffffc42d1ae0;$x;torch::autograd::Engine::thread_init;torch::autograd::Engine::thread_main;$x;$x;at::ThreadLocalState::setThreadLocalState;$x;$x;$x;$x 1
+thread: pt_autograd_0;[Broken backtraces];0xffffc42d1ae0;$x;torch::autograd::Engine::thread_init;torch::autograd::Engine::thread_main;$x;$x;c10::cuda::SetDevice;cudaGetDevice;0xffffc7176148;cuCtxGetDevice_v2;0xffff05a63d2c;0xffff05a018b4;0xffff05adf4e0 1
+thread: pt_autograd_0;[Broken backtraces];0xffffc42d1ae0;$x;torch::autograd::Engine::thread_init;torch::autograd::Engine::thread_main;NSYS_OSRT_pthread_cond_signal_1;0xffffe4aa9aac;0xffffe4c6c430 1
+thread: pt_autograd_0;[Broken backtraces];0xffffc42d1ae0;$x;torch::autograd::Engine::thread_init;torch::autograd::Engine::thread_main;at::ThreadLocalState::ThreadLocalState;at::impl::PythonTorchFunctionTLS::get_state;0xfffff7fc28d4 1
+thread: pt_autograd_0;[Broken backtraces];0xffffc42d1ae0;$x;torch::autograd::Engine::thread_init;torch::autograd::Engine::thread_main;at::ThreadLocalState::setThreadLocalState;$x 1
+thread: pt_autograd_0;[Broken backtraces];0xffffc42d1ae0;$x;torch::autograd::Engine::thread_init;torch::autograd::Engine::thread_main;at::ThreadLocalState::setThreadLocalState;$x;$x;$x;at::RecordFunction::currentThreadId 1
+thread: pt_autograd_0;[Broken backtraces];0xffffc42d1ae0;$x;torch::autograd::Engine::thread_init;torch::autograd::Engine::thread_main;at::ThreadLocalState::setThreadLocalState;$x;$x;0xfffff7fc28fc 1
+thread: pt_autograd_0;[Broken backtraces];0xffffc42d1ae0;$x;torch::autograd::Engine::thread_init;torch::autograd::Engine::thread_main;torch::autograd::Engine::evaluate_function;$x;$x;c10::cuda::ExchangeDevice;cudaGetDevice;0xffff05c150b0;0xfffe546a4dd8;0xfffe546a4be4;0xfffe546aa434;0xfffe546aa3f0 1
+thread: pt_autograd_0;[Broken backtraces];0xffffc42d1ae0;$x;torch::autograd::Engine::thread_init;torch::autograd::Engine::thread_main;torch::autograd::Engine::evaluate_function;$x;$x;c10::cuda::getCurrentCUDAStream 1
+thread: pt_autograd_0;[Broken backtraces];0xffffc42d1ae0;$x;torch::autograd::Engine::thread_init;torch::autograd::Engine::thread_main;torch::autograd::Engine::evaluate_function;$x;c10::cuda::SetDevice;cudaGetDevice;0xffff05c150b0;0xfffe546a4dd8;0xfffe546a4be4;0xfffe546aa434;0xfffe546aa1ec;0xfffe545cf04c 1
+thread: pt_autograd_0;[Broken backtraces];0xffffc42d1ae0;$x;torch::autograd::Engine::thread_init;torch::autograd::Engine::thread_main;torch::autograd::Engine::evaluate_function;$x;c10::cuda::SetDevice;cudaGetDevice;0xffffc7176140 1
+thread: pt_autograd_0;[Broken backtraces];0xffffc42d1ae0;$x;torch::autograd::Engine::thread_init;torch::autograd::Engine::thread_main;torch::autograd::Engine::evaluate_function;$x;c10::cuda::SetDevice;cudaGetDevice;0xffffc71a5fb8 1
+thread: pt_autograd_0;[Broken backtraces];0xffffc42d1ae0;$x;torch::autograd::Engine::thread_init;torch::autograd::Engine::thread_main;torch::autograd::Engine::evaluate_function;$x;torch::autograd::generated::ViewBackward0::apply;$x;at::_ops::reshape::call;$x;at::native::reshape_symint;at::_ops::view::call;$x;$x;at::_ops::view::redispatch;$x;$x;$x;$x 1
+thread: pt_autograd_0;[Broken backtraces];0xffffc42d1ae0;$x;torch::autograd::Engine::thread_init;torch::autograd::Engine::thread_main;torch::autograd::Engine::evaluate_function;$x;torch::autograd::generated::ViewBackward0::apply;$x;at::_ops::reshape::call;$x;at::native::reshape_symint;at::_ops::view::call;$x;$x;at::_ops::view::redispatch;$x;$x;at::_ops::view::redispatch;$x;$x 1
+thread: pt_autograd_0;[Broken backtraces];PyEval_RestoreThread;0x58b800 1
+thread: pt_autograd_0;[Broken backtraces];PyEval_SaveThread;NSYS_OSRT_pthread_cond_signal_1;0xffffe4a3d184 1
+thread: pt_autograd_0;[Broken backtraces];PyObject_IsInstance;0x4cb770 1
+thread: pt_autograd_0;[Broken backtraces];TracebackLogger::TracebackLogger;0xfffff7fc2910 1
+thread: pt_autograd_0;[Broken backtraces];_PyEval_EvalFrameDefault;0x4b49c0 1
+thread: pt_autograd_0;[Broken backtraces];_PyObject_GenericGetAttrWithDict;$x;$x;torch::autograd::SavedVariable::unpack;$x 1
+thread: pt_autograd_0;[Broken backtraces];cudnn::cnn::EngineInterface::execute;0xfff868c000e0;0xfff868c008c4;0xfffefe19ffd0 1
+thread: pt_autograd_0;[Broken backtraces];cudnn::cnn::EngineInterface::execute;0xfff868c00110 1
+thread: pt_autograd_0;[Broken backtraces];cudnn::cnn::EngineInterface::execute;0xfff868c00308;0xfff868c008d4 1
+thread: pt_autograd_0;[Broken backtraces];cudnn::cnn::EngineInterface::execute;0xfff868c00308;0xfff868c00a98;__libc_free 1
+thread: pt_autograd_0;[Broken backtraces];cudnn::cnn::EngineInterface::execute;0xfff868c00318 1
+thread: pt_autograd_0;[Broken backtraces];cudnn::cnn::EngineInterface::execute;0xfff868c004b8 1
+thread: pt_autograd_0;[Broken backtraces];cudnn::cnn::EngineInterface::execute;0xfff868c0575c;0xfff868c01374;0xfff866aafe30 1
+thread: pt_autograd_0;[Broken backtraces];operator new;__libc_malloc;0xffffe5864df8 1
+thread: pt_autograd_0;[Broken backtraces];pybind11::cpp_function::dispatcher;pybind11::cpp_function::initialize<>::{lambda()#1}::operator();pybind11::detail::argument_loader<>::call_impl<>;transformer_engine::pytorch::fused_attn_bwd;nvte_fused_attn_bwd_v2;transformer_engine::fused_attn_arbitrary_seqlen_bwd;transformer_engine::fused_attn::fused_attn_arbitrary_seqlen_bwd_impl;transformer_engine::fused_attn::get_graph<>;transformer_engine::fused_attn::FusedAttnConfig::make_cache_key;transformer_engine::cuda::current_device;cudaGetDevice;0xffff05c150b0;0xfffe546a4dd8;0xfffe546a4be4;0xfffe546aa434;0xfffe546aa1ec;0xfffe545cf078;0xfffe546178f0 1
+thread: pt_autograd_0;[Broken backtraces];std::__detail::_Prime_rehash_policy::_M_need_rehash;0xffffc428da70 1
+thread: pt_autograd_0;[Broken backtraces];std::condition_variable::wait;NSYS_OSRT_pthread_cond_wait_1;0xffffe4aa9854;0xffffe4b9f6ac;0xffffe5871c34 1
+thread: pt_autograd_0;_Py_NewReference 1

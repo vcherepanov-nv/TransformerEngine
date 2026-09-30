@@ -1,0 +1,191 @@
+{
+  "created_utc": "2026-09-30T19:35:39.457704+00:00",
+  "branch": "py-attn",
+  "source_commit": "f8815da06f194cbceba689987a176ec62172d710",
+  "branch_analysis": [
+    "Adds fused_attention_impl=cpp|python to select either TE C++ fused attention or the Python cuDNN frontend implementation.",
+    "The Python path builds and caches forward and backward SDPA graphs and exposes a PyTorch autograd implementation.",
+    "The branch also removes zero-dropout C++ RNG work, adds correctness tests, and adds runtime/graph-creation profiling with NVTX ranges.",
+    "These captures measure warmed-cache runtime. Cold-cache cuDNN graph construction is excluded by the warmup and capture range."
+  ],
+  "environment": {
+    "architecture": "aarch64",
+    "nsys_target_elf_machine": 183,
+    "nsys_cli": "/usr/local/cuda/bin/nsys",
+    "nsys_cli_resolved": "/usr/local/cuda-13.4/NsightSystems-cli-2026.5.1/target-linux-sbsa-armv8/nsys",
+    "nsys_target_binary": "/usr/local/cuda-13.4/NsightSystems-cli-2026.5.1/target-linux-sbsa-armv8/nsys",
+    "nsys_version": "NVIDIA Nsight Systems version 2026.5.1.18-265138582488v0",
+    "python_version": "3.12.3",
+    "pytorch_version": "2.14.0a0+4fdf77b940.nv26.08",
+    "cudnn_runtime_version": 92500,
+    "cudnn_frontend_version": "1.30.0",
+    "gpu": "NVIDIA GB200",
+    "gpu_device": 0,
+    "driver_version": "580.159.04",
+    "te_extension": "/workspace/TransformerEngine/transformer_engine_torch.cpython-312-aarch64-linux-gnu.so"
+  },
+  "workload": {
+    "mode": "fwd_bwd",
+    "measure": "runtime",
+    "dtype": "bf16",
+    "mask": "causal",
+    "layout": "bshd",
+    "dropout": 0,
+    "warmups": 20,
+    "iterations": 200,
+    "small_shape_bshd": [
+      1,
+      128,
+      1,
+      64
+    ],
+    "large_shape_bshd": [
+      2,
+      4096,
+      128,
+      128
+    ],
+    "cpu_overhead_per_iteration_sync": false
+  },
+  "profile_commands": [
+    "nsys profile --capture-range=cudaProfilerApi --capture-range-end=stop --trace=cuda,nvtx,osrt,cudnn --sample=process-tree --backtrace=dwarf --sampling-period=1696496 --samples-per-backtrace=1 --python-sampling=true --python-sampling-frequency=2000 --pytorch=functions-trace --output=/workspace/TransformerEngine/profiling_artifacts/py_attn_f8815da0_w20_i200/cpp_small python benchmarks/attention/profile_fused_attention.py --impl cpp --shape small --measure runtime --mode fwd_bwd --dtype bf16 --mask causal --device 0 --warmup 20 --iterations 200 --profile",
+    "nsys profile --capture-range=cudaProfilerApi --capture-range-end=stop --trace=cuda,nvtx,osrt,cudnn --sample=process-tree --backtrace=dwarf --sampling-period=1696496 --samples-per-backtrace=1 --python-sampling=true --python-sampling-frequency=2000 --pytorch=functions-trace --output=/workspace/TransformerEngine/profiling_artifacts/py_attn_f8815da0_w20_i200/python_small python benchmarks/attention/profile_fused_attention.py --impl python --shape small --measure runtime --mode fwd_bwd --dtype bf16 --mask causal --device 0 --warmup 20 --iterations 200 --profile",
+    "nsys profile --capture-range=cudaProfilerApi --capture-range-end=stop --trace=cuda,nvtx,osrt,cudnn --sample=process-tree --backtrace=dwarf --sampling-period=1696496 --samples-per-backtrace=1 --python-sampling=true --python-sampling-frequency=2000 --pytorch=functions-trace --output=/workspace/TransformerEngine/profiling_artifacts/py_attn_f8815da0_w20_i200/cpp_large python benchmarks/attention/profile_fused_attention.py --impl cpp --shape large --measure runtime --mode fwd_bwd --dtype bf16 --mask causal --device 0 --warmup 20 --iterations 200 --profile",
+    "nsys profile --capture-range=cudaProfilerApi --capture-range-end=stop --trace=cuda,nvtx,osrt,cudnn --sample=process-tree --backtrace=dwarf --sampling-period=1696496 --samples-per-backtrace=1 --python-sampling=true --python-sampling-frequency=2000 --pytorch=functions-trace --output=/workspace/TransformerEngine/profiling_artifacts/py_attn_f8815da0_w20_i200/python_large python benchmarks/attention/profile_fused_attention.py --impl python --shape large --measure runtime --mode fwd_bwd --dtype bf16 --mask causal --device 0 --warmup 20 --iterations 200 --profile"
+  ],
+  "conversion_commands": [
+    "nsys export --type=sqlite --include-json=true --dynamic-tables=all --quiet=true --force-overwrite=true --output=/workspace/TransformerEngine/profiling_artifacts/py_attn_f8815da0_w20_i200/cpp_small.sqlite /workspace/TransformerEngine/profiling_artifacts/py_attn_f8815da0_w20_i200/cpp_small.nsys-rep",
+    "python /workspace/TransformerEngine/profiling_artifacts/py_attn_f8815da0_w20_i200/tools/stackcollapse_nsys.py --nsys=/usr/local/cuda/bin --full_function_names --out=/workspace/TransformerEngine/profiling_artifacts/py_attn_f8815da0_w20_i200/cpp_small.cpu.folded /workspace/TransformerEngine/profiling_artifacts/py_attn_f8815da0_w20_i200/cpp_small.nsys-rep",
+    "nsys export --type=sqlite --include-json=true --dynamic-tables=all --quiet=true --force-overwrite=true --output=/workspace/TransformerEngine/profiling_artifacts/py_attn_f8815da0_w20_i200/python_small.sqlite /workspace/TransformerEngine/profiling_artifacts/py_attn_f8815da0_w20_i200/python_small.nsys-rep",
+    "python /workspace/TransformerEngine/profiling_artifacts/py_attn_f8815da0_w20_i200/tools/stackcollapse_nsys.py --nsys=/usr/local/cuda/bin --full_function_names --out=/workspace/TransformerEngine/profiling_artifacts/py_attn_f8815da0_w20_i200/python_small.cpu.folded /workspace/TransformerEngine/profiling_artifacts/py_attn_f8815da0_w20_i200/python_small.nsys-rep",
+    "nsys export --type=sqlite --include-json=true --dynamic-tables=all --quiet=true --force-overwrite=true --output=/workspace/TransformerEngine/profiling_artifacts/py_attn_f8815da0_w20_i200/cpp_large.sqlite /workspace/TransformerEngine/profiling_artifacts/py_attn_f8815da0_w20_i200/cpp_large.nsys-rep",
+    "python /workspace/TransformerEngine/profiling_artifacts/py_attn_f8815da0_w20_i200/tools/stackcollapse_nsys.py --nsys=/usr/local/cuda/bin --full_function_names --out=/workspace/TransformerEngine/profiling_artifacts/py_attn_f8815da0_w20_i200/cpp_large.cpu.folded /workspace/TransformerEngine/profiling_artifacts/py_attn_f8815da0_w20_i200/cpp_large.nsys-rep",
+    "nsys export --type=sqlite --include-json=true --dynamic-tables=all --quiet=true --force-overwrite=true --output=/workspace/TransformerEngine/profiling_artifacts/py_attn_f8815da0_w20_i200/python_large.sqlite /workspace/TransformerEngine/profiling_artifacts/py_attn_f8815da0_w20_i200/python_large.nsys-rep",
+    "python /workspace/TransformerEngine/profiling_artifacts/py_attn_f8815da0_w20_i200/tools/stackcollapse_nsys.py --nsys=/usr/local/cuda/bin --full_function_names --out=/workspace/TransformerEngine/profiling_artifacts/py_attn_f8815da0_w20_i200/python_large.cpu.folded /workspace/TransformerEngine/profiling_artifacts/py_attn_f8815da0_w20_i200/python_large.nsys-rep",
+    "python /workspace/TransformerEngine/profiling_artifacts/py_attn_f8815da0_w20_i200/tools/validate_and_fold_python.py /workspace/TransformerEngine/profiling_artifacts/py_attn_f8815da0_w20_i200"
+  ],
+  "benchmark_printed_cuda_event_average_ms": {
+    "cpp_small": 0.735,
+    "python_small": 0.695,
+    "cpp_large": 3.73,
+    "python_large": 3.735
+  },
+  "helper_provenance": {
+    "url": "https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/nsight-systems-2026.3.2_2026.3.2.476-1_amd64.deb",
+    "package_sha256": "e9bf0ff9c613ff5545095a4177676a9579cb666e78c8621c3792f3559e2c1690",
+    "extracted_members": [
+      "host-linux-x64/Scripts/Flamegraph/stackcollapse_nsys.py",
+      "host-linux-x64/Scripts/Flamegraph/README.md"
+    ],
+    "package_installed": false,
+    "amd64_binaries_executed": false,
+    "reason": "Portable Python helper is absent from the existing ARM CLI-only installation. The helper executes the installed ARM nsys via --nsys=/usr/local/cuda/bin."
+  },
+  "folded_data_notes": [
+    "*.cpu.folded was generated by the unmodified NVIDIA stackcollapse_nsys.py with --full_function_names. It extracts native CPU samples only.",
+    "The stock NVIDIA SQL groups samples by leaf symbol and module and emits one representative stack per group. Raw CPU stacks are retained in the SQLite and .nsys-rep files.",
+    "*.python.folded is supplementary Python periodic sampling data, decoded from exported NVTX JSON payloads and folded by full root-to-leaf stack including file and line.",
+    "Python folded weights are sample counts. All recorded Python thread states are included; these are not exclusively on-CPU measurements.",
+    "Native backtraces contain some unresolved addresses, ARM mapping symbols, and broken-stack markers. Diagnostics are retained in validation.json.",
+    "Nsight emitted possible event-incompleteness warnings. All 200 measured iterations, forward calls, backward calls, and 800 expected kernels were independently verified.",
+    "The reported timings include profiling and sampling overhead, including PyTorch function tracing; they are not uninstrumented benchmark timings."
+  ],
+  "artifacts": {
+    "convert_commands.sh": {
+      "bytes": 2896,
+      "sha256": "02c17a5c9cf5eac50d5c86ba9c5d4fc43f672f147a69546f33c63ffd2f19081b"
+    },
+    "cpp_large.cpu.folded": {
+      "bytes": 349844,
+      "sha256": "a108184239f6e316984ae994dec6e3b7bc6f4d97cf71cc4dd0e899ef0c58db30"
+    },
+    "cpp_large.nsys-rep": {
+      "bytes": 504669,
+      "sha256": "ae637ab7f26bdc7e219e946514cb6179f602ab8873ff3b4f7f3a95f61831da04"
+    },
+    "cpp_large.python.folded": {
+      "bytes": 37760,
+      "sha256": "7d1dee2aa186c7ef40eeed1b81fbd26118440389fb67fa120ebd0629f88fc4e8"
+    },
+    "cpp_large.sqlite": {
+      "bytes": 2723840,
+      "sha256": "48fad3381ba8cb0eb6a6a9bae58f30920557fe10cb98b6ce8d2ff9513e459a2e"
+    },
+    "cpp_small.cpu.folded": {
+      "bytes": 279937,
+      "sha256": "68acef32c30641dcf1041e64a2d848c22cab8743d21e8cfa4b52db8e1f10de13"
+    },
+    "cpp_small.nsys-rep": {
+      "bytes": 460914,
+      "sha256": "b42f3eb51ffa6052f79c62dc03308e1b047ee4b809b61ecabd680884acf21efc"
+    },
+    "cpp_small.python.folded": {
+      "bytes": 41320,
+      "sha256": "82ff2123b58310b441b47b81231bdd1cb04a06dd77e25d24073f3e0ea0743321"
+    },
+    "cpp_small.sqlite": {
+      "bytes": 1630208,
+      "sha256": "270d74ec8f646f3772d736921311274ec4aea7225c938b3bd740445b75614b9c"
+    },
+    "profile_commands.sh": {
+      "bytes": 2304,
+      "sha256": "1f6210bea79d5e35c8be9a590f92e42f5be9a2556859a24ca8ffdf2c30efc24d"
+    },
+    "python_large.cpu.folded": {
+      "bytes": 68993,
+      "sha256": "6df04c19abafead4489eab5a5b5617b5fc1ee4f3d7cac5ea576a69c5c0415620"
+    },
+    "python_large.nsys-rep": {
+      "bytes": 481975,
+      "sha256": "2226e6a995454f4eda1f2ba68ccf35c5e16ffe8d79db29edf5ba7868a5c6ef5c"
+    },
+    "python_large.python.folded": {
+      "bytes": 41172,
+      "sha256": "d068b2379d1961b60255968b87b3e93213a315997866d6f9c3ded99f9e6dbde3"
+    },
+    "python_large.sqlite": {
+      "bytes": 2588672,
+      "sha256": "c46cc2a05d15e460f0776ed0763b4f741ef83673736bbebf36cc59d374dc60d3"
+    },
+    "python_small.cpu.folded": {
+      "bytes": 42724,
+      "sha256": "ea653c18b044b4b11cea09b6b97291646fa56136167cce069aa485fe1a3bc415"
+    },
+    "python_small.nsys-rep": {
+      "bytes": 436001,
+      "sha256": "aa022334729fd3b9f747f4f7466a7b7249effc3d2196cac40760414b60a9ba04"
+    },
+    "python_small.python.folded": {
+      "bytes": 49076,
+      "sha256": "e5a4256fecfd4e987f3ae195948eac33a3b087a79595fd7e0fe08de81e33a263"
+    },
+    "python_small.sqlite": {
+      "bytes": 1437696,
+      "sha256": "378b043dcc586a917678a4cd9ba59ce2de655d83206dc171521f777da8d381d8"
+    },
+    "tools/README.md": {
+      "bytes": 2174,
+      "sha256": "ac63b00aca3541d422325e35aa5b893497d91b350ae59778879c23acf2c6457a"
+    },
+    "tools/finalize_artifacts.py": {
+      "bytes": 7154,
+      "sha256": "d6c64db052fbb21ff37fce7cb9cf72ca0de1e571070ab1c6b4f94a0b5019d9bd"
+    },
+    "tools/inspect_sqlite.py": {
+      "bytes": 1278,
+      "sha256": "618835b47b22de107c036e2dfd884a0747ed2449d40582baceaef93e47bcb412"
+    },
+    "tools/stackcollapse_nsys.py": {
+      "bytes": 14988,
+      "sha256": "65064f0a3e1fc17e90f4dd0d43fecf2bdbaae49d5b3313a84033c2de0b2c8218"
+    },
+    "tools/validate_and_fold_python.py": {
+      "bytes": 5837,
+      "sha256": "3200850998b59b56b79c82b127e15233ce8bdd6ab5fc850b5e0ee915f4797817"
+    },
+    "validation.json": {
+      "bytes": 9346,
+      "sha256": "2408471d08f4d0a5de509b62d14948c2301f9c66cac1c48a7d878d9c13940e45"
+    }
+  }
+}

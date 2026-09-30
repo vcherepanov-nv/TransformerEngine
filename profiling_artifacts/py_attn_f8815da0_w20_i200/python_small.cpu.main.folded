@@ -1,0 +1,115 @@
+_PyEval_EvalFrameDefault 27
+PyUnicode_FromFormatV 3
+0x586720 2
+PyObject_Free 2
+PyObject_GetAttr 2
+PyObject_Malloc 2
+[Broken backtraces];0x503534;$x;at::_ops::empty_memory_format::call;$x;at::_ops::empty_memory_format::redispatch;$x;$x;at::native::empty_cuda;at::detail::empty_cuda;at::detail::empty_cuda;at::detail::empty_generic;$x;$x;$x;c10::CachingAllocator::AcceleratorAllocatorConfig::instance 2
+[Broken backtraces];0x503534;pybind11::cpp_function::dispatcher 2
+[Broken backtraces];0x514f08;PyObject_GC_UnTrack 2
+[Broken backtraces];_PyEval_EvalFrameDefault;$x 2
+_PyObject_GenericGetAttrWithDict 2
+_PyType_Lookup 2
+0x4b2d7c 1
+0x4c6cfc 1
+0x4d790c 1
+0x4f11c4 1
+0x4f11d0 1
+0x4f120c 1
+0x4f5230 1
+0x4fb000 1
+0x4fe848 1
+0x50e804 1
+0x52239c 1
+0x52288c 1
+0x529104 1
+0x53f3b0 1
+0x561f20 1
+0x58b8d4 1
+0x61c94c 1
+PyCell_New 1
+PyDict_GetItem 1
+PyFunction_New 1
+PyLong_FromLong 1
+PyLong_FromLongLong 1
+PyMem_Realloc 1
+PyObject_GC_UnTrack 1
+PyObject_GetItem 1
+PyObject_GetIter 1
+PyObject_RichCompareBool 1
+PyObject_SetAttr 1
+[Broken backtraces];0x4cbd18;$x;torch::PyWarningHandler::PyWarningHandler;c10::WarningUtils::get_warning_handler 1
+[Broken backtraces];0x4cbd18;$x;torch::PythonArgParser::raw_parse;$x 1
+[Broken backtraces];0x4cc49c;0xfffe68afd50c;0xfffe68afcde8;0xfffe68ac1c08;0xfffe68ac2aa8;0xfffe688dca90;0xfffe688edf34;0xfffe68b00a50;0xfffe68b13c88;0xfffe68b61f90 1
+[Broken backtraces];0x4d51d8;_PyThreadState_UncheckedGet 1
+[Broken backtraces];0x50332c;PyUFunc_GenericReduction;PyArray_FromAny;PyArray_FromAny_int;PyArray_DiscoverDTypeAndShape 1
+[Broken backtraces];0x50332c;PyUFunc_GenericReduction;PyUFunc_ReduceWrapper;raw_array_assign_scalar 1
+[Broken backtraces];0x50332c;PyUFunc_GenericReduction;_npy_parse_arguments 1
+[Broken backtraces];0x50332c;PyUFunc_GenericReduction;npy_find_array_wrap;PyErr_ExceptionMatches 1
+[Broken backtraces];0x503404;0x528900 1
+[Broken backtraces];0x503534;$x 1
+[Broken backtraces];0x503534;$x;$x;torch::autograd::Engine::execute;$x;$x;$x 1
+[Broken backtraces];0x503534;$x;$x;torch::autograd::Engine::execute;torch::autograd::Engine::compute_dependencies;$x;at::accelerator::getAccelerator 1
+[Broken backtraces];0x503534;$x;at::_ops::empty_memory_format::call;$x;at::_ops::empty_memory_format::redispatch;$x;$x;$x;$x;c10::cuda::ExchangeDevice;cudaGetDevice;0xffff05c150b0;0xfffe48694dd8;0xfffe48694be4;0xfffe4869a434;0xfffe4869a268;0xfffe486a2cec;0xfffe48603318 1
+[Broken backtraces];0x503534;$x;at::_ops::empty_memory_format::call;$x;at::_ops::empty_memory_format::redispatch;$x;$x;$x;c10::cuda::SetDevice;cudaGetDevice;0xffff05c150b0;0xfffe48694dd8;0xfffe48694be4;0xfffe4869a43c 1
+[Broken backtraces];0x503534;$x;at::_ops::empty_memory_format::call;$x;at::_ops::empty_memory_format::redispatch;$x;$x;at::native::empty_cuda;at::detail::empty_cuda;at::detail::empty_cuda;$x;c10::cuda::MaybeSetDevice;$x;cuDevicePrimaryCtxGetState;0xffff05a65630;0xfffe48694dd8;0xfffe48694c58 1
+[Broken backtraces];0x503534;$x;at::_ops::empty_memory_format::call;$x;at::_ops::empty_memory_format::redispatch;$x;$x;at::native::empty_cuda;at::detail::empty_cuda;at::detail::empty_cuda;$x;c10::cuda::MaybeSetDevice;$x;cuDevicePrimaryCtxGetState;0xffff05a65668;0xffff05bf87d8 1
+[Broken backtraces];0x503534;$x;at::_ops::empty_memory_format::call;$x;at::_ops::empty_memory_format::redispatch;$x;$x;at::native::empty_cuda;at::detail::empty_cuda;at::detail::empty_cuda;at::detail::empty_generic;$x 1
+[Broken backtraces];0x503534;$x;at::_ops::empty_memory_format::call;$x;at::_ops::empty_memory_format::redispatch;$x;$x;at::native::empty_cuda;at::detail::empty_cuda;at::detail::empty_cuda;at::detail::empty_generic;$x;$x;$x;$x 1
+[Broken backtraces];0x503534;$x;at::_ops::view::call;$x;$x;$x 1
+[Broken backtraces];0x503534;$x;at::_ops::view::call;$x;$x;$x;$x;$x 1
+[Broken backtraces];0x503534;$x;at::_ops::view::call;$x;$x;at::_ops::view::redispatch;$x;$x;at::_ops::view::redispatch;$x;at::native::view 1
+[Broken backtraces];0x503534;$x;at::_ops::view::call;$x;$x;c10::GradMode::is_enabled;c10::AutogradState::get_tls_state 1
+[Broken backtraces];0x503534;(anonymous namespace)::THPFunction_apply;$x 1
+[Broken backtraces];0x503534;(anonymous namespace)::THPFunction_apply;$x;torch::autograd::_wrap_outputs 1
+[Broken backtraces];0x503534;(anonymous namespace)::THPFunction_apply;$x;torch::autograd::_wrap_outputs;$x;$x 1
+[Broken backtraces];0x503534;(anonymous namespace)::THPFunction_apply;(anonymous namespace)::resolve_kwargs_to_positional;PyDict_Size 1
+[Broken backtraces];0x503534;(anonymous namespace)::THPFunction_apply;(anonymous namespace)::unpack_input 1
+[Broken backtraces];0x503534;(anonymous namespace)::THPFunction_apply;(anonymous namespace)::unpack_input;torch::autograd::impl::gradient_edge;at::TensorBase::grad_fn 1
+[Broken backtraces];0x503534;pybind11::cpp_function::dispatcher;pybind11::cpp_function::initialize<>::{lambda()#1}::_FUN;cudnn_frontend::python_bindings::VariantPackNative::read_from;cudnn_frontend::python_bindings::VariantPackNative::read_operand;TorchDLPackExchangeAPI::DLTensorFromPyObjectNoSync 1
+[Broken backtraces];0x503534;pybind11::cpp_function::dispatcher;pybind11::cpp_function::initialize<>::{lambda()#1}::_FUN;cudnn_frontend::python_bindings::read_buffer_extent;TorchDLPackExchangeAPI::DLTensorFromPyObjectNoSync;pybind11::detail::type_caster<>::load;$x 1
+[Broken backtraces];0x503534;pybind11::cpp_function::dispatcher;pybind11::cpp_function::initialize<>::{lambda()#1}::_FUN;pybind11::detail::list_caster<>::load;PySequence_GetItem 1
+[Broken backtraces];0x503534;pybind11::cpp_function::dispatcher;pybind11::detail::function_call::~function_call 1
+[Broken backtraces];0x5220d4;0xfffe68afe680;PyObject_Init 1
+[Broken backtraces];0x523834;$x;$x 1
+[Broken backtraces];0x523834;$x;$x;c10::TensorImpl::~TensorImpl;$x;$x;c10::cuda::CUDACachingAllocator::Native::DeviceCachingAllocator::free_locked;$x;$x;c10::cuda::CUDACachingAllocator::Native::(anonymous namespace)::BlockPool::erase_from_blocks;std::_Rb_tree<>::erase;c10::cuda::CUDACachingAllocator::Native::(anonymous namespace)::BlockComparatorSizeCounterAddress 1
+[Broken backtraces];0x5a4020;0xffffe4bb4474;0xffffe50fcdfc;NSYS_MEM_malloc 1
+[Broken backtraces];0x5a4020;0xffffe4bc28f0;0xffffe49e2d08;0xffffe49e2aa4;0xffffe49ee8e0 1
+[Broken backtraces];0x5a4020;0xffffe4bc2a04;0xffffe49e9f90;0xffffe49f2a34;0xffffe49eee0c;0xffffe4c8a6f0 1
+[Broken backtraces];0xffff05408e6c;cuLaunchKernelEx;0xffff05a15678;0xffff05a90460;0xffff05a90be0;0xffff05a91150;0xffff05b1eb78;0xffff05bcf454;0xffffe585a4c4;0xffffe59108c4 1
+[Broken backtraces];0xfffff7fa0850;0xfffff7fa0564 1
+[Broken backtraces];PyEval_SaveThread;NSYS_OSRT_pthread_cond_signal_1 1
+[Broken backtraces];PyEval_SaveThread;NSYS_OSRT_pthread_cond_signal_1;pthread_cond_signal 1
+[Broken backtraces];PyObject_RichCompare;0x4df580 1
+[Broken backtraces];PyUnicode_FromFormatV;0xffffe5871bc0 1
+[Broken backtraces];PyUnicode_FromFormatV;0xffffe5872ed4 1
+[Broken backtraces];PyUnicode_FromString;0xffffe5872efc 1
+[Broken backtraces];PyUnicode_RichCompare;__memcmpeq 1
+[Broken backtraces];TracebackLogger::~TracebackLogger;0xfffff7fc28f4 1
+[Broken backtraces];_PyEval_EvalFrameDefault;$x;$x 1
+[Broken backtraces];_PyEval_EvalFrameDefault;$x;$x;$x;c10::cuda::ExchangeDevice;cudaGetDevice;0xffff05c150b0;0xfffe48694dd8;0xfffe48694b98 1
+[Broken backtraces];_PyEval_EvalFrameDefault;$x;$x;at::indexing::impl::applySlice;at::_ops::slice_Tensor::call 1
+[Broken backtraces];_PyEval_EvalFrameDefault;$x;$x;c10::cuda::MaybeSetDevice;$x 1
+[Broken backtraces];_PyEval_EvalFrameDefault;$x;$x;c10::cuda::SetDevice;cudaGetDevice;0xffffc7136148;cuCtxGetDevice_v2;0xffff05a63c00 1
+[Broken backtraces];_PyEval_EvalFrameDefault;$x;c10::cuda::MaybeExchangeDevice;cudaGetDevice;0xffffc7136148;cuCtxGetDevice_v2;0xffff05a63d2c;0xffff05a01850 1
+[Broken backtraces];_PyEval_EvalFrameDefault;$x;pybind11::cpp_function::initialize<>::{lambda()#1}::_FUN;0xffffe49e4fa4;0xffffe49e4db8 1
+[Broken backtraces];_PyEval_EvalFrameDefault;$x;pybind11::cpp_function::initialize<>::{lambda()#1}::_FUN;0xffffe49e4fa4;0xffffe49e4ddc;0xffffe49f13c8;0xffffe49eee0c;0xffffe4c8a6d0 1
+[Broken backtraces];_PyEval_EvalFrameDefault;$x;pybind11::cpp_function::initialize<>::{lambda()#1}::_FUN;0xffffe49e4fa4;0xffffe49e4e0c;0xffffe4c6c430 1
+[Broken backtraces];_PyObject_GenericGetAttrWithDict;$x 1
+[Broken backtraces];_PyObject_GenericGetAttrWithDict;$x;$x 1
+[Broken backtraces];_PyObject_GenericGetAttrWithDict;$x;$x;$x;$x 1
+[Broken backtraces];_PyObject_GenericGetAttrWithDict;$x;$x;torch::autograd::impl::get_view_autograd_meta 1
+[Broken backtraces];_PyObject_GenericGetAttrWithDict;$x;at::TensorBase::grad_fn 1
+[Broken backtraces];_PyObject_GenericGetAttrWithDict;$x;torch::PyWarningHandler::PyWarningHandler;c10::WarningUtils::get_warning_handler 1
+[Broken backtraces];_PyObject_GenericGetAttrWithDict;$x;torch::PyWarningHandler::~PyWarningHandler 1
+[Broken backtraces];_PyObject_GenericGetAttrWithDict;$x;torch::autograd::functionToPyObject;$x 1
+[Broken backtraces];cudnn::cnn::EngineInterface::execute;0xfff86ca01204;0xfff86ca0149c;cuKernelSetAttribute;0xffff05a5c9a8;0xfffe48694dd8;0xfffe48694be4;0xfffe4869a434;0xfffe4869a268;0xfffe486a3594;0xfffe4860cbec;0xfffe485f1998 1
+[Broken backtraces];cudnn::cnn::EngineInterface::execute;0xfff86ca01204;0xfff86ca0149c;cuKernelSetAttribute;0xffff05a5c9e0;0xfffe48694dd8;0xfffe48694be4;0xfffe4869a434;0xfffe4869a268;0xfffe486a310c;0xfffe4860ccac 1
+[Broken backtraces];cudnn::cnn::EngineInterface::execute;0xfff86ca01204;0xfff86ca0149c;cuKernelSetAttribute;0xffff05a5c9e0;0xfffe48694dd8;0xfffe48694be4;0xfffe4869a434;0xfffe4869a268;0xfffe486a310c;0xfffe4860cf1c;0xfffe485e8b90;0xffffe4c993c4 1
+[Broken backtraces];cudnnBackendSetAttribute;cudnnBackendSetAttribute 1
+[Broken backtraces];operator new;__libc_malloc 1
+[Broken backtraces];operator new;__libc_malloc;0xffffe5864ee8 1
+_PyDict_GetItem_KnownHash 1
+_PyObject_Call_Prepend 1
+_PyObject_GC_New 1
+_PyObject_MakeTpCall 1

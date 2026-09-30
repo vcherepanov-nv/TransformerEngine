@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -eu
+cd /workspace/TransformerEngine
+
+nsys profile --capture-range=cudaProfilerApi --capture-range-end=stop --trace=cuda,nvtx,osrt,cudnn --sample=process-tree --backtrace=dwarf --sampling-period=1696496 --samples-per-backtrace=1 --python-sampling=true --python-sampling-frequency=2000 --pytorch=functions-trace --output=/workspace/TransformerEngine/profiling_artifacts/py_attn_f8815da0_w20_i200/cpp_small python benchmarks/attention/profile_fused_attention.py --impl cpp --shape small --measure runtime --mode fwd_bwd --dtype bf16 --mask causal --device 0 --warmup 20 --iterations 200 --profile
+
+nsys profile --capture-range=cudaProfilerApi --capture-range-end=stop --trace=cuda,nvtx,osrt,cudnn --sample=process-tree --backtrace=dwarf --sampling-period=1696496 --samples-per-backtrace=1 --python-sampling=true --python-sampling-frequency=2000 --pytorch=functions-trace --output=/workspace/TransformerEngine/profiling_artifacts/py_attn_f8815da0_w20_i200/python_small python benchmarks/attention/profile_fused_attention.py --impl python --shape small --measure runtime --mode fwd_bwd --dtype bf16 --mask causal --device 0 --warmup 20 --iterations 200 --profile
+
+nsys profile --capture-range=cudaProfilerApi --capture-range-end=stop --trace=cuda,nvtx,osrt,cudnn --sample=process-tree --backtrace=dwarf --sampling-period=1696496 --samples-per-backtrace=1 --python-sampling=true --python-sampling-frequency=2000 --pytorch=functions-trace --output=/workspace/TransformerEngine/profiling_artifacts/py_attn_f8815da0_w20_i200/cpp_large python benchmarks/attention/profile_fused_attention.py --impl cpp --shape large --measure runtime --mode fwd_bwd --dtype bf16 --mask causal --device 0 --warmup 20 --iterations 200 --profile
+
+nsys profile --capture-range=cudaProfilerApi --capture-range-end=stop --trace=cuda,nvtx,osrt,cudnn --sample=process-tree --backtrace=dwarf --sampling-period=1696496 --samples-per-backtrace=1 --python-sampling=true --python-sampling-frequency=2000 --pytorch=functions-trace --output=/workspace/TransformerEngine/profiling_artifacts/py_attn_f8815da0_w20_i200/python_large python benchmarks/attention/profile_fused_attention.py --impl python --shape large --measure runtime --mode fwd_bwd --dtype bf16 --mask causal --device 0 --warmup 20 --iterations 200 --profile

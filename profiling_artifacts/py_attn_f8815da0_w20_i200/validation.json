@@ -1,0 +1,162 @@
+[
+  {
+    "name": "cpp_small",
+    "measured_range": {
+      "name": "fused_attention_cpp_fwd_bwd_b1_s128_h1_d64_bf16_causal",
+      "start_ns": 29915314,
+      "end_ns": 176806509
+    },
+    "measured_iteration_counts": {
+      "_iteration": 200,
+      "_forward_call": 200,
+      "_backward_call": 200
+    },
+    "gpu_kernel_count": 800,
+    "gpu_kernel_names": [
+      "cudnn_generated_fort_native_sdpa_sm80_flash_bprop_wmma_f16_knob_2_64x128x64_1x4x1_cga1x1x1_kernel0_0",
+      "cudnn_generated_fort_native_sdpa_sm80_flash_fprop_wmma_f16_knob_1_128x64x64_4x1x1_cga1x1x1_kernel0_0",
+      "void cudnn::fusion::compute_dot_do_o_specialized<(bool)1, (int)64>(const void *, const void *, void *, void *, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, float, const void *, const void *, const void *, const void *, const void *, bool, const void *, void *, const void *, int, int, int, int, int, int, int, int, int, float *, float *, float *)",
+      "void cudnn::fusion::rearrange_n_convert_dq<(bool)1>(const void *, void *, void *, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, const void *, void *, void *, bool, cudnnDataType_t)"
+    ],
+    "native_cpu_samples": 279,
+    "native_cpu_folded": {
+      "unique_stacks": 199,
+      "total_weight": 279
+    },
+    "python_samples_in_report": 351,
+    "python_samples_in_measured_range": 351,
+    "python_unique_stacks": 38,
+    "python_thread_states_in_measured_range": {
+      "Uninterruptible": 80,
+      "Running": 271
+    },
+    "pytorch_function_ranges": 1000,
+    "diagnostic_warnings": [
+      "Failed to load symbols for VMA 0xffff41a00000-0xffff42e20000 from '/usr/local/cuda-13.4/targets/sbsa-linux/lib/libcublasLt.so.13.7.0.27'",
+      "Failed to load symbols for VMA 0xffff16200000-0xffff33750000 from '/usr/local/cuda-13.4/targets/sbsa-linux/lib/libcublasLt.so.13.7.0.27'",
+      "Not all NVTX events might have been collected.",
+      "Not all CUDA events might have been collected.",
+      "Not all OS runtime libraries events might have been collected."
+    ]
+  },
+  {
+    "name": "python_small",
+    "measured_range": {
+      "name": "fused_attention_python_fwd_bwd_b1_s128_h1_d64_bf16_causal",
+      "start_ns": 29951194,
+      "end_ns": 168906241
+    },
+    "measured_iteration_counts": {
+      "_iteration": 200,
+      "_forward_call": 200,
+      "_backward_call": 200
+    },
+    "gpu_kernel_count": 800,
+    "gpu_kernel_names": [
+      "cudnn_generated_fort_native_sdpa_sm80_flash_bprop_wmma_f16_knob_2_64x128x64_1x4x1_cga1x1x1_kernel0_0",
+      "cudnn_generated_fort_native_sdpa_sm80_flash_fprop_wmma_f16_knob_1_128x64x64_4x1x1_cga1x1x1_kernel0_0",
+      "void cudnn::fusion::compute_dot_do_o_specialized<(bool)1, (int)64>(const void *, const void *, void *, void *, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, float, const void *, const void *, const void *, const void *, const void *, bool, const void *, void *, const void *, int, int, int, int, int, int, int, int, int, float *, float *, float *)",
+      "void cudnn::fusion::rearrange_n_convert_dq<(bool)1>(const void *, void *, void *, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, const void *, void *, void *, bool, cudnnDataType_t)"
+    ],
+    "native_cpu_samples": 260,
+    "native_cpu_folded": {
+      "unique_stacks": 176,
+      "total_weight": 260
+    },
+    "python_samples_in_report": 310,
+    "python_samples_in_measured_range": 310,
+    "python_unique_stacks": 47,
+    "python_thread_states_in_measured_range": {
+      "Uninterruptible": 106,
+      "Running": 204
+    },
+    "pytorch_function_ranges": 1000,
+    "diagnostic_warnings": [
+      "Failed to load symbols for VMA 0xffff41a00000-0xffff42e20000 from '/usr/local/cuda-13.4/targets/sbsa-linux/lib/libcublasLt.so.13.7.0.27'",
+      "Failed to load symbols for VMA 0xffff16200000-0xffff33750000 from '/usr/local/cuda-13.4/targets/sbsa-linux/lib/libcublasLt.so.13.7.0.27'",
+      "Not all NVTX events might have been collected.",
+      "Not all CUDA events might have been collected.",
+      "Not all OS runtime libraries events might have been collected."
+    ]
+  },
+  {
+    "name": "cpp_large",
+    "measured_range": {
+      "name": "fused_attention_cpp_fwd_bwd_b2_s4096_h128_d128_bf16_causal",
+      "start_ns": 31473747,
+      "end_ns": 777460872
+    },
+    "measured_iteration_counts": {
+      "_iteration": 200,
+      "_forward_call": 200,
+      "_backward_call": 200
+    },
+    "gpu_kernel_count": 800,
+    "gpu_kernel_names": [
+      "cudnn_generated_fort_native_sdpa_sm100_flash_bprop_f16_knob_2_128x128x128_1x4x1_cga1x1x1_kernel0_0",
+      "cudnn_generated_fort_native_sdpa_sm100_flash_fprop_f16_knob_1_128x128x128_4x1x1_cga1x1x1_kernel0_0",
+      "void cudnn::fusion::compute_dot_do_o_specialized<(bool)1, (int)128>(const void *, const void *, void *, void *, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, float, const void *, const void *, const void *, const void *, const void *, bool, const void *, void *, const void *, int, int, int, int, int, int, int, int, int, float *, float *, float *)",
+      "void cudnn::fusion::convert_dq_to_16bits<(bool)1>(const void *, void *, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, const float *, const float *, const float *, float *, const void *, void *, void *, bool, bool)"
+    ],
+    "native_cpu_samples": 1419,
+    "native_cpu_folded": {
+      "unique_stacks": 328,
+      "total_weight": 1419
+    },
+    "python_samples_in_report": 1516,
+    "python_samples_in_measured_range": 1516,
+    "python_unique_stacks": 34,
+    "python_thread_states_in_measured_range": {
+      "Uninterruptible": 82,
+      "Running": 1434
+    },
+    "pytorch_function_ranges": 1000,
+    "diagnostic_warnings": [
+      "Failed to load symbols for VMA 0xffff41a00000-0xffff42e20000 from '/usr/local/cuda-13.4/targets/sbsa-linux/lib/libcublasLt.so.13.7.0.27'",
+      "Failed to load symbols for VMA 0xffff16200000-0xffff33750000 from '/usr/local/cuda-13.4/targets/sbsa-linux/lib/libcublasLt.so.13.7.0.27'",
+      "Not all NVTX events might have been collected.",
+      "Not all CUDA events might have been collected.",
+      "Not all OS runtime libraries events might have been collected."
+    ]
+  },
+  {
+    "name": "python_large",
+    "measured_range": {
+      "name": "fused_attention_python_fwd_bwd_b2_s4096_h128_d128_bf16_causal",
+      "start_ns": 29940731,
+      "end_ns": 776832489
+    },
+    "measured_iteration_counts": {
+      "_iteration": 200,
+      "_forward_call": 200,
+      "_backward_call": 200
+    },
+    "gpu_kernel_count": 800,
+    "gpu_kernel_names": [
+      "cudnn_generated_fort_native_sdpa_sm100_flash_bprop_f16_knob_2_128x128x128_1x4x1_cga1x1x1_kernel0_0",
+      "cudnn_generated_fort_native_sdpa_sm100_flash_fprop_f16_knob_1_128x128x128_4x1x1_cga1x1x1_kernel0_0",
+      "void cudnn::fusion::compute_dot_do_o_specialized<(bool)1, (int)128>(const void *, const void *, void *, void *, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, float, const void *, const void *, const void *, const void *, const void *, bool, const void *, void *, const void *, int, int, int, int, int, int, int, int, int, float *, float *, float *)",
+      "void cudnn::fusion::convert_dq_to_16bits<(bool)1>(const void *, void *, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int, const float *, const float *, const float *, float *, const void *, void *, void *, bool, bool)"
+    ],
+    "native_cpu_samples": 1426,
+    "native_cpu_folded": {
+      "unique_stacks": 302,
+      "total_weight": 1426
+    },
+    "python_samples_in_report": 1490,
+    "python_samples_in_measured_range": 1490,
+    "python_unique_stacks": 41,
+    "python_thread_states_in_measured_range": {
+      "Uninterruptible": 98,
+      "Running": 1392
+    },
+    "pytorch_function_ranges": 1000,
+    "diagnostic_warnings": [
+      "Failed to load symbols for VMA 0xffff41a00000-0xffff42e20000 from '/usr/local/cuda-13.4/targets/sbsa-linux/lib/libcublasLt.so.13.7.0.27'",
+      "Failed to load symbols for VMA 0xffff16200000-0xffff33750000 from '/usr/local/cuda-13.4/targets/sbsa-linux/lib/libcublasLt.so.13.7.0.27'",
+      "Not all NVTX events might have been collected.",
+      "Not all CUDA events might have been collected.",
+      "Not all OS runtime libraries events might have been collected."
+    ]
+  }
+]

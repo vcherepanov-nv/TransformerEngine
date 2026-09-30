@@ -1,0 +1,118 @@
+{
+  "renderer_url": "https://raw.githubusercontent.com/brendangregg/FlameGraph/master/flamegraph.pl",
+  "renderer_sha256": "088f82e6848a4f12a56e1e8e8170ee6761fccf12e5615cd64630f6b087c99ea7",
+  "report": "benchmarks/attention/fused_attention_python_vs_cpp_sampling_report.md",
+  "graphs": [
+    {
+      "file": "benchmarks/attention/fused_attention_python_vs_cpp_sampling_flamegraphs/cpp_large.cpu.full.svg",
+      "bytes": 189704,
+      "sha256": "5be12cd2991a7b47ac9e6f3939a60f3525ee416885b2f4a539b747b2e6972b25"
+    },
+    {
+      "file": "benchmarks/attention/fused_attention_python_vs_cpp_sampling_flamegraphs/cpp_large.cpu.submission.svg",
+      "bytes": 161817,
+      "sha256": "481e6a6328019a6af88e03beee93ea900f86834c35153afa61c96332f495ccbf"
+    },
+    {
+      "file": "benchmarks/attention/fused_attention_python_vs_cpp_sampling_flamegraphs/cpp_large.python.full.svg",
+      "bytes": 32821,
+      "sha256": "035f05611a62d38ebf5ee917fa635b23a218a8981be5e493fb05d8541ddd3b60"
+    },
+    {
+      "file": "benchmarks/attention/fused_attention_python_vs_cpp_sampling_flamegraphs/cpp_large.python.submission.svg",
+      "bytes": 32442,
+      "sha256": "5c25f2fe54bb9c227b8751129214749c5c12228c71375a5145295493f06123e4"
+    },
+    {
+      "file": "benchmarks/attention/fused_attention_python_vs_cpp_sampling_flamegraphs/cpp_small.cpu.full.svg",
+      "bytes": 157580,
+      "sha256": "118f4ce5550ed440bbd7aac4927dfe6f32221764cb49d6c943fb5d861accdb96"
+    },
+    {
+      "file": "benchmarks/attention/fused_attention_python_vs_cpp_sampling_flamegraphs/cpp_small.cpu.submission.svg",
+      "bytes": 157034,
+      "sha256": "b5113c2b1e6b61f20999a8f752db0bebe8e2492c37af0c03ceeb4e4f6ca1debb"
+    },
+    {
+      "file": "benchmarks/attention/fused_attention_python_vs_cpp_sampling_flamegraphs/cpp_small.python.full.svg",
+      "bytes": 35552,
+      "sha256": "73aadfd96e4f01364bf5db0f9a2fd1e78863b94a8e966810b3e0a240605702c1"
+    },
+    {
+      "file": "benchmarks/attention/fused_attention_python_vs_cpp_sampling_flamegraphs/cpp_small.python.submission.svg",
+      "bytes": 35301,
+      "sha256": "c0de269daca2b537ff79f26b374d1231d6fb3883f60c98cffab9f5ad5ae5f9e5"
+    },
+    {
+      "file": "benchmarks/attention/fused_attention_python_vs_cpp_sampling_flamegraphs/python_large.cpu.full.svg",
+      "bytes": 160037,
+      "sha256": "6cf87228271c31f4a80a3f0da6c46d899774ec28b6f9f55052f1b2cf85a983b9"
+    },
+    {
+      "file": "benchmarks/attention/fused_attention_python_vs_cpp_sampling_flamegraphs/python_large.cpu.submission.svg",
+      "bytes": 134549,
+      "sha256": "e44ea5f438bd39b7aa9893667b3d27e471244f63a94595ae50fdad5598bd227e"
+    },
+    {
+      "file": "benchmarks/attention/fused_attention_python_vs_cpp_sampling_flamegraphs/python_large.python.full.svg",
+      "bytes": 32958,
+      "sha256": "8a1273d6f0b2b1a070066f09353a92ccf760f71ffe86bd8b41ea17f679f7c968"
+    },
+    {
+      "file": "benchmarks/attention/fused_attention_python_vs_cpp_sampling_flamegraphs/python_large.python.submission.svg",
+      "bytes": 33305,
+      "sha256": "459ffa640790c283d09074d18574484392aaf57eb3007cb4bf21efe29dc9cff0"
+    },
+    {
+      "file": "benchmarks/attention/fused_attention_python_vs_cpp_sampling_flamegraphs/python_small.cpu.full.svg",
+      "bytes": 123365,
+      "sha256": "c8325605853a669f9ac997b4cba3c42b9f80d20905e1394d2a16b2059ae22bb5"
+    },
+    {
+      "file": "benchmarks/attention/fused_attention_python_vs_cpp_sampling_flamegraphs/python_small.cpu.submission.svg",
+      "bytes": 122636,
+      "sha256": "73132f138a5d09a75c691f4240e349d69ee907cedb05b57246424fdda95419d8"
+    },
+    {
+      "file": "benchmarks/attention/fused_attention_python_vs_cpp_sampling_flamegraphs/python_small.python.full.svg",
+      "bytes": 36595,
+      "sha256": "b9ce1b1badd94bc2d576cba525fdd2a04f4b3cb9da620912402eaa082a6ec058"
+    },
+    {
+      "file": "benchmarks/attention/fused_attention_python_vs_cpp_sampling_flamegraphs/python_small.python.submission.svg",
+      "bytes": 35611,
+      "sha256": "8d19fecf6b3620c454677308b9bec295f6ca214ef38abae3fb12777cb7f556bb"
+    }
+  ],
+  "source_report_sha256": {
+    "cpp_small": "b42f3eb51ffa6052f79c62dc03308e1b047ee4b809b61ecabd680884acf21efc",
+    "python_small": "aa022334729fd3b9f747f4f7466a7b7249effc3d2196cac40760414b60a9ba04",
+    "cpp_large": "ae637ab7f26bdc7e219e946514cb6179f602ab8873ff3b4f7f3a95f61831da04",
+    "python_large": "2226e6a995454f4eda1f2ba68ccf35c5e16ffe8d79db29edf5ba7868a5c6ef5c"
+  },
+  "analysis_sha256": "d3734f13e1cd876c7237aa148df12588160a175de26c0946181a136e94f71fe9",
+  "report_sha256": "da1f055cf9ad5632da0b84c99a48b6503493fcb0abefe2d5e2bad6ac2ccf5856",
+  "analysis_scripts_sha256": {
+    "analyze_report.py": "254f5998a2c9a5c4df647ef97bc85db77085dd1f6a7fb51a7383b404bfe3fe46",
+    "attribute_flamegraphs.py": "c734024adf3f88f474e92f7b6bfe580d28d7e0f80ea7ca4aa4b5ba722f249702",
+    "build_sampling_report.py": "4c3767f75c01bf00fbec679d3d97d908616fa19a99d73a918d4019faa9788f23"
+  },
+  "derived_folded_sha256": {
+    "cpp_large.cpu.full.folded": "cc231e11dc22d3b23e31dcb2734b19456010fdfb364471e68570960a488bdc5c",
+    "cpp_large.cpu.submission.folded": "710ebb405232f76ab7f9b4861dfc10c66ac6d35c1144d90da99c202da1e81699",
+    "cpp_large.python.full.folded": "e71b0c3dbe7314c95a19b1b670e6e03620e6223f3dfe7bbadbdcb2eae4a78703",
+    "cpp_large.python.submission.folded": "481c67a7bd4bea0d8b8c640320139bfda6f56b976279697b5038973be934365e",
+    "cpp_small.cpu.full.folded": "413f1ee11b1aafb3d06abce0e221f6b5b371dacd382263c7b66ba71d6a422f5d",
+    "cpp_small.cpu.submission.folded": "06543911aad871de34dd192c8ef0548836021b6f0c9168fea124d2624e7f87f0",
+    "cpp_small.python.full.folded": "07740afbc9b5f3e857e0304877394e08761649668645de215ee008d63a1ae257",
+    "cpp_small.python.submission.folded": "27b285d21724a6e3221439955cc66c000dbf36c0fb66619b67aa11f3acaa03e6",
+    "python_large.cpu.full.folded": "220bfd3ec475e9704f032778a23d270dd45784bc322f785e896d38176c19b200",
+    "python_large.cpu.submission.folded": "61c539ff63ff0e98f94a6e628d65d40a3be5aa5ed88e683b3c9f8479b913baac",
+    "python_large.python.full.folded": "82b5f60310f890c6f1015a70c8b24616b8c1e799c3ffc3178838fa2942d58030",
+    "python_large.python.submission.folded": "a647428872051f09808ffdd5cb2e9e8dc031518bb1408b8a1b2ec965d7392623",
+    "python_small.cpu.full.folded": "3bf44ee2cc3fc8c6420bc24f03a93b0e0d9cc7bc22324b3fcd01b0bd4ec0c8f3",
+    "python_small.cpu.submission.folded": "2c97875bfb6e46ca398693220b5201780fd171231c3518f6017d23c9a3f494b4",
+    "python_small.python.full.folded": "74fe21b7a6d4e7fadf53793f95f3cfb45f61ae8f779c16f70e110f39963c1885",
+    "python_small.python.submission.folded": "acfc238a6e557a569f73d2c7d7219eb0480bb32cfb05537bb2e510bbf4455eca"
+  }
+}
