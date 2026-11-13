@@ -1,0 +1,27 @@
+{
+  "pid": 348666,
+  "targets": {
+    "te_fused_attn_forward_ffi": {
+      "executions": 16,
+      "metadata_queries": 1,
+      "errors": 0
+    },
+    "te_fused_attn_backward_ffi": {
+      "executions": 16,
+      "metadata_queries": 1,
+      "errors": 0
+    },
+    "te_fused_attn_score_mod_forward_ffi": {
+      "executions": 0,
+      "metadata_queries": 1,
+      "errors": 0
+    },
+    "te_fused_attn_score_mod_backward_ffi": {
+      "executions": 0,
+      "metadata_queries": 1,
+      "errors": 0
+    }
+  },
+  "main_score_mod_cache": {},
+  "total_executions": 32
+}

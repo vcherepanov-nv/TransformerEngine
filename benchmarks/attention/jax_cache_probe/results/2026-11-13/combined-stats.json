@@ -1,0 +1,192 @@
+{
+  "method": {
+    "execution": "Observed successful EXECUTE-stage attention FFI handler invocations in the parent pytest process; native trampolines forward original handlers unchanged. Metadata queries and initialization/warm-up stages excluded.",
+    "caches": "NVTE_FUSED_ATTN_CACHE_DEBUG=1:all, summed across passes. Main Python score-mod cache events are separately instrumented and included, matching branch coverage.",
+    "scope": "L0 common suite: 5,135 identical node IDs in identical order, one fresh process per revision. Deterministic mode is a separate fresh-process measurement, not added to L0 totals.",
+    "hit_counts": "Lookup sites differ between native and Python implementations; execution counts independently establish identical runtime attention workload."
+  },
+  "results": {
+    "l0": {
+      "main": {
+        "tests": {
+          "passed": 1234,
+          "skipped": 3901
+        },
+        "metrics": {
+          "Graphs created": 1090,
+          "Graphs cached": 977,
+          "Graphs compiled": 917,
+          "Graph executions": 2420,
+          "Cache hits": 33176,
+          "Cache misses": 1090
+        },
+        "native_cache_events": {
+          "HIT": 33174,
+          "MISS": 1084,
+          "CREATE_GRAPH": 1084,
+          "CACHE_GRAPH": 971,
+          "BUILD_PLANS": 911,
+          "EXECUTE": 2412
+        },
+        "python_cache_events": {},
+        "ffi_probe": {
+          "pid": 340436,
+          "targets": {
+            "te_fused_attn_forward_ffi": {
+              "executions": 1220,
+              "metadata_queries": 1,
+              "errors": 0
+            },
+            "te_fused_attn_backward_ffi": {
+              "executions": 1192,
+              "metadata_queries": 1,
+              "errors": 0
+            },
+            "te_fused_attn_score_mod_forward_ffi": {
+              "executions": 5,
+              "metadata_queries": 1,
+              "errors": 0
+            },
+            "te_fused_attn_score_mod_backward_ffi": {
+              "executions": 3,
+              "metadata_queries": 1,
+              "errors": 0
+            }
+          },
+          "main_score_mod_cache": {
+            "MISS": 6,
+            "CREATE_GRAPH": 6,
+            "BUILD_PLANS": 6,
+            "CACHE_GRAPH": 6,
+            "HIT": 2
+          },
+          "total_executions": 2420
+        }
+      },
+      "branch": {
+        "tests": {
+          "passed": 1234,
+          "skipped": 3901
+        },
+        "metrics": {
+          "Graphs created": 800,
+          "Graphs cached": 687,
+          "Graphs compiled": 625,
+          "Graph executions": 2420,
+          "Cache hits": 10263,
+          "Cache misses": 800
+        },
+        "native_cache_events": {},
+        "python_cache_events": {
+          "BUILD_PLANS": 625,
+          "CACHE_GRAPH": 687,
+          "CREATE_GRAPH": 800,
+          "HIT": 10263,
+          "MISS": 800
+        },
+        "ffi_probe": {
+          "pid": 340244,
+          "targets": {
+            "te_cudnn_graph_ffi": {
+              "executions": 2420,
+              "metadata_queries": 1,
+              "errors": 0
+            }
+          },
+          "main_score_mod_cache": {},
+          "total_executions": 2420
+        }
+      },
+      "common_case_count": 5135,
+      "identical_case_outcomes_and_skip_reasons": true
+    },
+    "deterministic": {
+      "main": {
+        "tests": {
+          "passed": 16,
+          "skipped": 24
+        },
+        "metrics": {
+          "Graphs created": 32,
+          "Graphs cached": 32,
+          "Graphs compiled": 32,
+          "Graph executions": 32,
+          "Cache hits": 416,
+          "Cache misses": 32
+        },
+        "native_cache_events": {
+          "HIT": 416,
+          "MISS": 32,
+          "CREATE_GRAPH": 32,
+          "CACHE_GRAPH": 32,
+          "BUILD_PLANS": 32,
+          "EXECUTE": 32
+        },
+        "python_cache_events": {},
+        "ffi_probe": {
+          "pid": 348666,
+          "targets": {
+            "te_fused_attn_forward_ffi": {
+              "executions": 16,
+              "metadata_queries": 1,
+              "errors": 0
+            },
+            "te_fused_attn_backward_ffi": {
+              "executions": 16,
+              "metadata_queries": 1,
+              "errors": 0
+            },
+            "te_fused_attn_score_mod_forward_ffi": {
+              "executions": 0,
+              "metadata_queries": 1,
+              "errors": 0
+            },
+            "te_fused_attn_score_mod_backward_ffi": {
+              "executions": 0,
+              "metadata_queries": 1,
+              "errors": 0
+            }
+          },
+          "main_score_mod_cache": {},
+          "total_executions": 32
+        }
+      },
+      "branch": {
+        "tests": {
+          "passed": 16,
+          "skipped": 24
+        },
+        "metrics": {
+          "Graphs created": 32,
+          "Graphs cached": 32,
+          "Graphs compiled": 32,
+          "Graph executions": 32,
+          "Cache hits": 128,
+          "Cache misses": 32
+        },
+        "native_cache_events": {},
+        "python_cache_events": {
+          "BUILD_PLANS": 32,
+          "CACHE_GRAPH": 32,
+          "CREATE_GRAPH": 32,
+          "HIT": 128,
+          "MISS": 32
+        },
+        "ffi_probe": {
+          "pid": 348419,
+          "targets": {
+            "te_cudnn_graph_ffi": {
+              "executions": 32,
+              "metadata_queries": 1,
+              "errors": 0
+            }
+          },
+          "main_score_mod_cache": {},
+          "total_executions": 32
+        }
+      },
+      "common_case_count": 40,
+      "identical_case_outcomes_and_skip_reasons": true
+    }
+  }
+}

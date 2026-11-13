@@ -1,0 +1,25 @@
+[FUSED-ATTN-CACHE] JAX Python frontend summary
+  f16 bwd BUILD_PLANS=299
+  f16 bwd CACHE_GRAPH=329
+  f16 bwd CREATE_GRAPH=330
+  f16 bwd HIT=5131
+  f16 bwd MISS=330
+  f16 fwd BUILD_PLANS=326
+  f16 fwd CACHE_GRAPH=358
+  f16 fwd CREATE_GRAPH=470
+  f16 fwd HIT=5132
+  f16 fwd MISS=470
+  f16 bwd build_operation_graph: 330 calls, 0.001 ms average
+  f16 bwd build_plans: 299 calls, 190.229 ms average
+  f16 bwd check_support: 329 calls, 0.021 ms average
+  f16 bwd create_execution_plans: 330 calls, 6.637 ms average
+  f16 bwd deselect_engines: 3 calls, 0.005 ms average
+  f16 bwd filter_plans: 329 calls, 0.040 ms average
+  f16 bwd validate: 330 calls, 0.070 ms average
+  f16 fwd build_operation_graph: 470 calls, 0.001 ms average
+  f16 fwd build_plans: 326 calls, 412.816 ms average
+  f16 fwd check_support: 358 calls, 0.026 ms average
+  f16 fwd create_execution_plans: 470 calls, 3.063 ms average
+  f16 fwd deselect_engines: 3 calls, 0.005 ms average
+  f16 fwd filter_plans: 358 calls, 0.077 ms average
+  f16 fwd validate: 470 calls, 0.217 ms average

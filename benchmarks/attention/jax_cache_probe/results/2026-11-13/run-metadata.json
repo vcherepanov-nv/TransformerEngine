@@ -1,0 +1,91 @@
+{
+  "branch_commit": "8ad48332",
+  "main_commit": "ab4b9222",
+  "selection": "/tmp/te-attn-coverage/common-tests.args",
+  "selection_sha256": "741b0e0dfb0436b443162673cc1244eedd9a59270fcd04f3460a328bdd055d22",
+  "common_collected_cases": 5135,
+  "hardware": {
+    "gpu": "NVIDIA GB200",
+    "gpu_count": 4,
+    "compute_capability": "10.0",
+    "devices_per_pytest_process": 1,
+    "driver": "595.84.01"
+  },
+  "software": {
+    "jax": "0.12.1.dev20261113+289b65056b",
+    "jaxlib": "0.12.1.dev20261113",
+    "flax": "0.12.12",
+    "pytest": "9.2.0",
+    "nvidia-cudnn-frontend": "1.31.0"
+  },
+  "cuda_toolkit": "13.4.3",
+  "cudnn_backend": "9.27.0",
+  "method": "Native trampolines around the execute entries of TE attention FFI handler bundles. Forwards original metadata queries unchanged and excludes metadata and non-EXECUTE stages from counts. No TE source or build changes.",
+  "main_score_mod_cache": "External Python wrappers count the previously uninstrumented score-mod cache accesses and graph builds, added to main native-cache totals.",
+  "calibration": {
+    "cases": 4,
+    "expected_executions": 9,
+    "main_observed": 9,
+    "branch_observed": 9,
+    "main_extra_cache": {
+      "CREATE_GRAPH": 6,
+      "CACHE_GRAPH": 6,
+      "BUILD_PLANS": 6,
+      "HIT": 2,
+      "MISS": 6
+    }
+  },
+  "discarded_api_logging": "Raw cuDNN API log counts include initialization/warm-up calls and entry/exit messages; those counts are not used in the execution comparison.",
+  "fresh_process_per_revision": true,
+  "sharding": false,
+  "environment": {
+    "NVTE_FUSED_ATTN_CACHE_DEBUG": "1:all",
+    "NVTE_ALLOW_NONDETERMINISTIC_ALGO": "1",
+    "NVTE_JAX_UNITTEST_LEVEL": "L0",
+    "NVTE_REPORT_IF_CUTEDSL_BACKEND_NOT_CHOSEN": "ERROR",
+    "JAX_ENABLE_COMPILATION_CACHE": "false",
+    "TRITON_PTXAS_PATH": "/usr/local/cuda/bin/ptxas"
+  },
+  "probe_sources": {
+    "ffi_probe.cpp": "9cae0ea7cc541693fe0009267817449c98cb97b092b8863be7b84ca855ff6731",
+    "ffi_probe_plugin.py": "0e443ab39e1eaa0e486f687b6e94d877037672968add08f96511508400795154"
+  },
+  "reference_report": "https://github.com/NVIDIA/TransformerEngine/pull/3693#discussion_r4569240886",
+  "runs": [
+    {
+      "label": "branch-l0",
+      "cwd": "/workspace/TransformerEngine",
+      "command": "CUDA_VISIBLE_DEVICES=0 PYTHONPATH=/tmp/te-attn-execution-stats TE_FFI_PROBE_OUTPUT=/tmp/te-attn-execution-stats/branch-l0.probe.json TE_PROBE_MAIN_SCORE_MOD=0 NVTE_FUSED_ATTN_CACHE_DEBUG=1:all NVTE_ALLOW_NONDETERMINISTIC_ALGO=1 NVTE_JAX_UNITTEST_LEVEL=L0 NVTE_REPORT_IF_CUTEDSL_BACKEND_NOT_CHOSEN=ERROR JAX_ENABLE_COMPILATION_CACHE=false TRITON_PTXAS_PATH=/usr/local/cuda/bin/ptxas python -m pytest -p ffi_probe_plugin -c tests/jax/pytest.ini -v -s --tb=short --junitxml=/tmp/te-attn-execution-stats/branch-l0.xml @/tmp/te-attn-coverage/common-tests.args > /tmp/te-attn-execution-stats/branch-l0.stdout.log 2> /tmp/te-attn-execution-stats/branch-l0.stderr.log",
+      "exit_code": 0
+    },
+    {
+      "label": "main-l0",
+      "cwd": "/tmp/te-attn-main",
+      "command": "CUDA_VISIBLE_DEVICES=1 PYTHONPATH=/tmp/te-attn-execution-stats TE_FFI_PROBE_OUTPUT=/tmp/te-attn-execution-stats/main-l0.probe.json TE_PROBE_MAIN_SCORE_MOD=1 NVTE_FUSED_ATTN_CACHE_DEBUG=1:all NVTE_ALLOW_NONDETERMINISTIC_ALGO=1 NVTE_JAX_UNITTEST_LEVEL=L0 NVTE_REPORT_IF_CUTEDSL_BACKEND_NOT_CHOSEN=ERROR JAX_ENABLE_COMPILATION_CACHE=false TRITON_PTXAS_PATH=/usr/local/cuda/bin/ptxas /tmp/te-attn-main-venv/bin/python -m pytest -p ffi_probe_plugin -c tests/jax/pytest.ini -v -s --tb=short --junitxml=/tmp/te-attn-execution-stats/main-l0.xml @/tmp/te-attn-coverage/common-tests.args > /tmp/te-attn-execution-stats/main-l0.stdout.log 2> /tmp/te-attn-execution-stats/main-l0.stderr.log",
+      "exit_code": 0
+    },
+    {
+      "label": "branch-deterministic",
+      "cwd": "/workspace/TransformerEngine",
+      "command": "CUDA_VISIBLE_DEVICES=2 PYTHONPATH=/tmp/te-attn-execution-stats TE_FFI_PROBE_OUTPUT=/tmp/te-attn-execution-stats/branch-deterministic.probe.json TE_PROBE_MAIN_SCORE_MOD=0 NVTE_FUSED_ATTN_CACHE_DEBUG=1:all NVTE_ALLOW_NONDETERMINISTIC_ALGO=0 NVTE_JAX_UNITTEST_LEVEL=L0 NVTE_REPORT_IF_CUTEDSL_BACKEND_NOT_CHOSEN=ERROR JAX_ENABLE_COMPILATION_CACHE=false TRITON_PTXAS_PATH=/usr/local/cuda/bin/ptxas python -m pytest -p ffi_probe_plugin -c tests/jax/pytest.ini -v -s --tb=short --junitxml=/tmp/te-attn-execution-stats/branch-deterministic.xml tests/jax/test_fused_attn.py -k TestFusedAttnWithDeterminism > /tmp/te-attn-execution-stats/branch-deterministic.stdout.log 2> /tmp/te-attn-execution-stats/branch-deterministic.stderr.log",
+      "exit_code": 0,
+      "separate_deterministic_measurement": true
+    },
+    {
+      "label": "main-deterministic",
+      "cwd": "/tmp/te-attn-main",
+      "command": "CUDA_VISIBLE_DEVICES=3 PYTHONPATH=/tmp/te-attn-execution-stats TE_FFI_PROBE_OUTPUT=/tmp/te-attn-execution-stats/main-deterministic.probe.json TE_PROBE_MAIN_SCORE_MOD=1 NVTE_FUSED_ATTN_CACHE_DEBUG=1:all NVTE_ALLOW_NONDETERMINISTIC_ALGO=0 NVTE_JAX_UNITTEST_LEVEL=L0 NVTE_REPORT_IF_CUTEDSL_BACKEND_NOT_CHOSEN=ERROR JAX_ENABLE_COMPILATION_CACHE=false TRITON_PTXAS_PATH=/usr/local/cuda/bin/ptxas /tmp/te-attn-main-venv/bin/python -m pytest -p ffi_probe_plugin -c tests/jax/pytest.ini -v -s --tb=short --junitxml=/tmp/te-attn-execution-stats/main-deterministic.xml tests/jax/test_fused_attn.py -k TestFusedAttnWithDeterminism > /tmp/te-attn-execution-stats/main-deterministic.stdout.log 2> /tmp/te-attn-execution-stats/main-deterministic.stderr.log",
+      "exit_code": 0,
+      "separate_deterministic_measurement": true
+    }
+  ],
+  "completed": true,
+  "validation": {
+    "both_l0_executions": 2420,
+    "l0_common_cases": 5135,
+    "identical_test_outcomes": true,
+    "raw_cache_counters_unchanged_from_previous_run": true,
+    "no_ffi_errors": true,
+    "both_deterministic_executions": 32
+  }
+}

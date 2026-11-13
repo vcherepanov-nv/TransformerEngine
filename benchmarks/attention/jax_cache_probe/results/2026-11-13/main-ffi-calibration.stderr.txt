@@ -1,0 +1,16 @@
+
+[FUSED-ATTN-CACHE] ===== summary begin =====
+[FUSED-ATTN-CACHE] tid=0   dev=0   | f16 fwd | hit=  14, miss=   4, create_graph=   4, cache_graph=   4, build_plans=   1, execute=   1
+[FUSED-ATTN-CACHE] tid=0   dev=0   | f16 bwd | hit=   7, miss=   3, create_graph=   3, cache_graph=   3, build_plans=   0, execute=   0
+[FUSED-ATTN-CACHE] tid=all dev=all | f16 fwd | hit=  14, miss=   4, create_graph=   4, cache_graph=   4, build_plans=   1, execute=   1
+[FUSED-ATTN-CACHE] tid=all dev=all | f16 bwd | hit=   7, miss=   3, create_graph=   3, cache_graph=   3, build_plans=   0, execute=   0
+[FUSED-ATTN-CACHE] f16 fwd validate               | calls=4 | time=    0.059 ms/call
+[FUSED-ATTN-CACHE] f16 fwd build_operation_graph  | calls=4 | time=    3.146 ms/call
+[FUSED-ATTN-CACHE] f16 fwd create_execution_plans | calls=4 | time=    1.890 ms/call
+[FUSED-ATTN-CACHE] f16 fwd check_support          | calls=4 | time=    0.027 ms/call
+[FUSED-ATTN-CACHE] f16 fwd build_plans            | calls=1 | time=   31.163 ms/call
+[FUSED-ATTN-CACHE] f16 bwd validate               | calls=3 | time=    0.013 ms/call
+[FUSED-ATTN-CACHE] f16 bwd build_operation_graph  | calls=3 | time=    1.079 ms/call
+[FUSED-ATTN-CACHE] f16 bwd create_execution_plans | calls=3 | time=    2.835 ms/call
+[FUSED-ATTN-CACHE] f16 bwd check_support          | calls=3 | time=    0.017 ms/call
+[FUSED-ATTN-CACHE] ===== summary end =====

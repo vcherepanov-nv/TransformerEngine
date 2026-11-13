@@ -1,0 +1,13 @@
+mode,Metric,main,branch
+l0,Graphs created,1090,800
+l0,Graphs cached,977,687
+l0,Graphs compiled,917,625
+l0,Graph executions,2420,2420
+l0,Cache hits,33176,10263
+l0,Cache misses,1090,800
+deterministic,Graphs created,32,32
+deterministic,Graphs cached,32,32
+deterministic,Graphs compiled,32,32
+deterministic,Graph executions,32,32
+deterministic,Cache hits,416,128
+deterministic,Cache misses,32,32

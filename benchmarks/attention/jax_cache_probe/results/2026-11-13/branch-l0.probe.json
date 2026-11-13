@@ -1,0 +1,12 @@
+{
+  "pid": 340244,
+  "targets": {
+    "te_cudnn_graph_ffi": {
+      "executions": 2420,
+      "metadata_queries": 1,
+      "errors": 0
+    }
+  },
+  "main_score_mod_cache": {},
+  "total_executions": 2420
+}
