@@ -1,0 +1,26 @@
+Run from the root of the revision being tested after building/installing it.
+Build configuration used:
+NVTE_CUDA_ARCHS="100" NVTE_FRAMEWORK=pytorch pip install --no-build-isolation -v -e ".[test]"
+
+Set this to the retained artifacts in a checkout of the artifacts branch.
+Keep that checkout accessible while testing either revision:
+comparison_dir=/path/to/artifacts-checkout/artifacts/attention-cache-comparison-after-skip-fix
+
+On main:
+bash "$comparison_dir/commands.sh" collect main
+bash "$comparison_dir/commands.sh" run main
+
+On the PR branch:
+bash "$comparison_dir/commands.sh" collect pr
+bash "$comparison_dir/commands.sh" run pr
+
+commands.sh contains the complete pytest invocation and QA environment flags.
+common-tests.txt selects the 41 shared functions (5,259 parameter cases).
+Run one pytest process without xdist or extra selection flags.
+Cache counters and build timings print at process exit; reruns create log files.
+
+Render the retained statistics snapshot:
+python "$comparison_dir/compare-stats.py"
+
+cache-comparison.json retains counters, build-stage timings, outcomes, revisions,
+and software/GPU versions. The renderer reads this snapshot, not future run logs.

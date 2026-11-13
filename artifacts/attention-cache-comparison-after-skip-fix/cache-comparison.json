@@ -1,0 +1,296 @@
+{
+  "revisions": {
+    "main": "ab4b922219f2e3de3c575d40209340ef24cd4d20",
+    "pr": "8ad483327d59ea1c33cb6997ffae60e51093aa82"
+  },
+  "selection": {
+    "argument_file": "common-tests.txt",
+    "functions": 41,
+    "cases": 5259,
+    "matching_case_ids_and_outcomes": true
+  },
+  "environment": {
+    "python": "3.12.3",
+    "pytest": "9.2.0",
+    "torch": "2.15.0a0+875d815502.nv26.10",
+    "cuda": "13.4",
+    "cudnn_backend": 92700,
+    "cudnn_frontend": "1.32.3",
+    "nccl": [
+      2,
+      32,
+      3
+    ],
+    "gpu_model": "NVIDIA GB200",
+    "compute_capability": [
+      10,
+      0
+    ],
+    "visible_gpu_count": 4,
+    "execution_gpu": 0,
+    "driver": "595.84.01"
+  },
+  "scope": "Parent pytest process; the cache-contract subprocess captures its own diagnostics.",
+  "main": {
+    "counters": {
+      "f16 fwd": {
+        "CREATE_GRAPH": 754,
+        "CACHE_GRAPH": 738,
+        "BUILD_PLANS": 522,
+        "EXECUTE": 2731,
+        "HIT": 15991,
+        "MISS": 754
+      },
+      "f16 bwd": {
+        "CREATE_GRAPH": 565,
+        "CACHE_GRAPH": 526,
+        "BUILD_PLANS": 391,
+        "EXECUTE": 2648,
+        "HIT": 14098,
+        "MISS": 565
+      },
+      "fp8 fwd": {
+        "CREATE_GRAPH": 568,
+        "CACHE_GRAPH": 567,
+        "BUILD_PLANS": 405,
+        "EXECUTE": 2398,
+        "HIT": 13690,
+        "MISS": 568
+      },
+      "fp8 bwd": {
+        "CREATE_GRAPH": 291,
+        "CACHE_GRAPH": 291,
+        "BUILD_PLANS": 207,
+        "EXECUTE": 850,
+        "HIT": 6226,
+        "MISS": 291
+      }
+    },
+    "totals": {
+      "CREATE_GRAPH": 2178,
+      "CACHE_GRAPH": 2122,
+      "BUILD_PLANS": 1525,
+      "EXECUTE": 8627,
+      "HIT": 50005,
+      "MISS": 2178
+    },
+    "build_stage_timings": {
+      "f16 fwd validate": {
+        "calls": 754,
+        "average_ms": 0.019
+      },
+      "f16 fwd build_operation_graph": {
+        "calls": 746,
+        "average_ms": 0.388
+      },
+      "f16 fwd create_execution_plans": {
+        "calls": 738,
+        "average_ms": 1.512
+      },
+      "f16 fwd check_support": {
+        "calls": 738,
+        "average_ms": 0.018
+      },
+      "f16 fwd build_plans": {
+        "calls": 522,
+        "average_ms": 215.094
+      },
+      "f16 bwd validate": {
+        "calls": 565,
+        "average_ms": 0.012
+      },
+      "f16 bwd build_operation_graph": {
+        "calls": 534,
+        "average_ms": 1.287
+      },
+      "f16 bwd create_execution_plans": {
+        "calls": 534,
+        "average_ms": 3.113
+      },
+      "f16 bwd check_support": {
+        "calls": 526,
+        "average_ms": 0.017
+      },
+      "f16 bwd build_plans": {
+        "calls": 391,
+        "average_ms": 199.3
+      },
+      "fp8 fwd validate": {
+        "calls": 568,
+        "average_ms": 0.02
+      },
+      "fp8 fwd build_operation_graph": {
+        "calls": 567,
+        "average_ms": 0.445
+      },
+      "fp8 fwd create_execution_plans": {
+        "calls": 567,
+        "average_ms": 1.078
+      },
+      "fp8 fwd check_support": {
+        "calls": 567,
+        "average_ms": 0.019
+      },
+      "fp8 fwd build_plans": {
+        "calls": 405,
+        "average_ms": 177.511
+      },
+      "fp8 bwd validate": {
+        "calls": 291,
+        "average_ms": 0.02
+      },
+      "fp8 bwd build_operation_graph": {
+        "calls": 291,
+        "average_ms": 7.861
+      },
+      "fp8 bwd create_execution_plans": {
+        "calls": 291,
+        "average_ms": 3.368
+      },
+      "fp8 bwd check_support": {
+        "calls": 291,
+        "average_ms": 0.02
+      },
+      "fp8 bwd build_plans": {
+        "calls": 207,
+        "average_ms": 332.751
+      }
+    },
+    "test_outcomes": {
+      "passed": 2734,
+      "skipped": 2525
+    },
+    "exit_code": 0
+  },
+  "pr": {
+    "counters": {
+      "f16 fwd": {
+        "CREATE_GRAPH": 591,
+        "CACHE_GRAPH": 575,
+        "BUILD_PLANS": 424,
+        "EXECUTE": 2731,
+        "HIT": 7977,
+        "MISS": 591
+      },
+      "f16 bwd": {
+        "CREATE_GRAPH": 574,
+        "CACHE_GRAPH": 535,
+        "BUILD_PLANS": 385,
+        "EXECUTE": 2648,
+        "HIT": 7709,
+        "MISS": 574
+      },
+      "fp8 fwd": {
+        "CREATE_GRAPH": 291,
+        "CACHE_GRAPH": 290,
+        "BUILD_PLANS": 210,
+        "EXECUTE": 2398,
+        "HIT": 6773,
+        "MISS": 291
+      },
+      "fp8 bwd": {
+        "CREATE_GRAPH": 290,
+        "CACHE_GRAPH": 290,
+        "BUILD_PLANS": 210,
+        "EXECUTE": 850,
+        "HIT": 2129,
+        "MISS": 290
+      }
+    },
+    "totals": {
+      "CREATE_GRAPH": 1746,
+      "CACHE_GRAPH": 1690,
+      "BUILD_PLANS": 1229,
+      "EXECUTE": 8627,
+      "HIT": 24588,
+      "MISS": 1746
+    },
+    "build_stage_timings": {
+      "f16 bwd build_operation_graph": {
+        "calls": 574,
+        "average_ms": 0.0
+      },
+      "f16 bwd build_plans": {
+        "calls": 385,
+        "average_ms": 39.82
+      },
+      "f16 bwd check_support": {
+        "calls": 535,
+        "average_ms": 0.023
+      },
+      "f16 bwd create_execution_plans": {
+        "calls": 574,
+        "average_ms": 4.536
+      },
+      "f16 bwd validate": {
+        "calls": 574,
+        "average_ms": 0.058
+      },
+      "f16 fwd build_operation_graph": {
+        "calls": 583,
+        "average_ms": 0.001
+      },
+      "f16 fwd build_plans": {
+        "calls": 424,
+        "average_ms": 36.543
+      },
+      "f16 fwd check_support": {
+        "calls": 575,
+        "average_ms": 0.026
+      },
+      "f16 fwd create_execution_plans": {
+        "calls": 583,
+        "average_ms": 2.373
+      },
+      "f16 fwd validate": {
+        "calls": 591,
+        "average_ms": 0.206
+      },
+      "fp8 bwd build_operation_graph": {
+        "calls": 290,
+        "average_ms": 0.001
+      },
+      "fp8 bwd build_plans": {
+        "calls": 210,
+        "average_ms": 81.167
+      },
+      "fp8 bwd check_support": {
+        "calls": 290,
+        "average_ms": 0.024
+      },
+      "fp8 bwd create_execution_plans": {
+        "calls": 290,
+        "average_ms": 11.6
+      },
+      "fp8 bwd validate": {
+        "calls": 290,
+        "average_ms": 0.052
+      },
+      "fp8 fwd build_operation_graph": {
+        "calls": 291,
+        "average_ms": 0.001
+      },
+      "fp8 fwd build_plans": {
+        "calls": 210,
+        "average_ms": 44.821
+      },
+      "fp8 fwd check_support": {
+        "calls": 290,
+        "average_ms": 0.026
+      },
+      "fp8 fwd create_execution_plans": {
+        "calls": 291,
+        "average_ms": 2.017
+      },
+      "fp8 fwd validate": {
+        "calls": 291,
+        "average_ms": 0.058
+      }
+    },
+    "test_outcomes": {
+      "passed": 2734,
+      "skipped": 2525
+    },
+    "exit_code": 0
+  }
+}
