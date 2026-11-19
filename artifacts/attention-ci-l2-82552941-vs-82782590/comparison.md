@@ -1,6 +1,8 @@
 # L2 JAX cuDNN attention CI comparison
 
-The five job pairs with complete attention results ran and passed **4,799** cases on main and **5,038** on the feature branch. Both recorded **zero attention failures or errors**. Every shared test ID kept the same outcome. The feature branch reported 323 additional cases, of which 239 passed and 84 were skipped. [Main pipeline 82552941](https://gitlab-master.nvidia.com/dl/transformerengine/transformerengine/-/pipelines/82552941) · [Feature pipeline 82782590](https://gitlab-master.nvidia.com/dl/transformerengine/transformerengine/-/pipelines/82782590) · [Module comparison](module_comparison.csv)
+**Zero L2 JAX attention cases that ran on main were recorded as skipped on the feature branch.** Matching exact pytest IDs within each of the seven job pairs, using JUnit reports and interrupted-job traces, confirmed that 7,634 of the 7,874 cases that ran on main also ran and passed on the feature branch. The feature GB200 NVL timeout left the other 240 without a recorded outcome. [Job attempts and sources](jobs.csv)
+
+The five job pairs with complete reports ran and passed **4,799** cases on main and **5,038** on the feature branch. Both recorded **zero attention failures or errors**. All 84 additional skips in these pairs came from test IDs added on the feature branch. [Main pipeline 82552941](https://gitlab-master.nvidia.com/dl/transformerengine/transformerengine/-/pipelines/82552941) · [Feature pipeline 82782590](https://gitlab-master.nvidia.com/dl/transformerengine/transformerengine/-/pipelines/82782590) · [Module comparison](module_comparison.csv)
 
 ## Job results
 
